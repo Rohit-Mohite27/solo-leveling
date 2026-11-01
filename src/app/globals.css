@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --beach-top: #efe8ff;
+  --beach-mid: #f7f0ff;
+  --beach-sand: #fff6ec;
+  --lilac: #7c6cf0;
+  --ink: #2c2550;
+}
+
+html,
+body {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  background: var(--beach-sand);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* Soft beach sky → sand wash with floating lilac blobs */
+.atmosphere {
+  background:
+    radial-gradient(ellipse 70% 45% at 15% 12%, rgba(196, 176, 245, 0.55), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 88% 18%, rgba(255, 214, 190, 0.55), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 70% 78%, rgba(167, 210, 255, 0.28), transparent 55%),
+    linear-gradient(180deg, var(--beach-top) 0%, var(--beach-mid) 42%, var(--beach-sand) 100%);
+  min-height: 100vh;
+}
+
+.soft-card {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(42, 36, 88, 0.08);
+  border: 1px solid rgba(124, 108, 240, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

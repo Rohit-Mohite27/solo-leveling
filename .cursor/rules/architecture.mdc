@@ -1,0 +1,40 @@
+---
+description: "Project architecture and layering rules"
+alwaysApply: true
+---
+
+# Movie Pass — Architecture
+
+Three apps: **customer frontend** (Next.js), **dashboard** (Next.js admin), **backend** (Express + Drizzle + MySQL).
+Do not invent voucher codes in Movie Pass — BigTree generates them; we store and serve what BigTree returns.
+
+## Frontend (customer) data flow
+
+Prefer: **UI component → `lib/api` / BFF `app/api` → backend `/api/v1`**.
+
+- Browser calls same-origin BFF routes under `app/api/*` (cookie-friendly).
+- Server-only code may use `MOVIEPASS_API_URL` / `NEXT_PUBLIC_API_URL` to reach the backend.
+- Never put secrets in `NEXT_PUBLIC_*`. Session is HttpOnly cookie from the backend.
+
+## Backend layering
+
+- **`*.routes.ts`** — path + auth/permission middleware
+- **`*.controller.ts`** — HTTP handlers
+- **`*.service.ts`** — business rules
+- **`*.repository.ts`** — all SQL
+- **`*.schema.ts`** — zod validation + response mappers
+
+Cross-module calls go **service → service**. Admin lives under `/api/v1/admin`.
+
+## Conventions
+
+- Backend: variables/params `snake_case`; functions `camelCase`; types `PascalCase`.
+- JSON response keys are `camelCase` (dashboard contract) — only in schema mappers.
+- REST, plural nouns, `/api/v1`. Success `{ success, data, meta? }`; error `{ success:false, code, message, errors? }`.
+- Keep TypeScript strict. No `any`; prefer `unknown` and narrow. No unchecked `as` casts of API JSON.
+
+## Security & dependencies
+
+- Never hardcode secrets. Use `.env` / `.env.example` (names only in example).
+- Do not add, remove or upgrade a dependency without asking first.
+- Dev stand-ins (`OTP_MODE=static`, `PAYMENT_GATEWAY=fake`, `BIGTREE_MODE=fake`) must not be suggested for production.

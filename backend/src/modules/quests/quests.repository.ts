@@ -1,0 +1,47 @@
+import { and, asc, eq } from "drizzle-orm";
+import { db } from "../../db/client.js";
+import { quests } from "../../db/schema.js";
+
+export async function findQuestsByHunterId(hunter_id: number) {
+  return db
+    .select()
+    .from(quests)
+    .where(and(eq(quests.hunter_id, hunter_id), eq(quests.is_active, true)))
+    .orderBy(asc(quests.sort_order), asc(quests.id));
+}
+
+export async function insertQuest(values: {
+  hunter_id: number;
+  name: string;
+  kind: "count" | "distance" | "duration" | "yesno" | "steps";
+  target: string;
+  unit: string;
+  accent: string;
+  sort_order?: number;
+}) {
+  const result = await db
+    .insert(quests)
+    .values({
+      hunter_id: values.hunter_id,
+      name: values.name,
+      kind: values.kind,
+      target: values.target,
+      unit: values.unit,
+      accent: values.accent,
+      sort_order: values.sort_order ?? 0,
+    })
+    .$returningId();
+  const id = result[0]?.id;
+  if (!id) throw new Error("Failed to create quest");
+  const rows = await db.select().from(quests).where(eq(quests.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function findQuestById(id: number) {
+  const rows = await db.select().from(quests).where(eq(quests.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function softDeleteQuest(id: number) {
+  await db.update(quests).set({ is_active: false }).where(eq(quests.id, id));
+}

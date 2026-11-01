@@ -1,0 +1,46 @@
+---
+description: "Verification checklist for every change"
+alwaysApply: true
+---
+
+# Verification checklist
+
+Follow this after every change.
+
+## 1. Explainability
+
+- Write simple, readable code. No clever tricks or unexplained magic.
+- After every change, explain in plain language what each changed file and function does, in order. For non-obvious logic, explain it line by line.
+- Add a short comment wherever the reason for something isn't obvious.
+- If you are unsure about any part of the code, say so explicitly.
+
+## 2. Packages
+
+- Never add a dependency without asking first.
+- When proposing one, state: the exact package name, why it's needed, whether the platform or an existing package already does the job, and whether it is maintained. Verify the package exists on npm (no guessed or misspelled names).
+- Pin versions. At the end of every step, list every change to `package.json`.
+- Run `npm audit` after dependency changes and report the result.
+
+## 3. Hardcoded keys and secrets
+
+- Never put API keys, tokens, passwords, or client secrets in source code.
+- Use environment/config and keep `.env.example` updated with variable **names** only, no values.
+- In Next.js, any `NEXT_PUBLIC_` variable is bundled into the client and visible to anyone. Never put a real secret in one. Secrets belong in server-only env or the backend `.env`.
+- Never log secrets, tokens, or customer personal details.
+- At the end of every step, scan the diff for secrets and report what you found.
+
+## 4. Test checklist
+
+- After every step, give a manual test checklist: exact steps in the app, the expected result, and edge cases (offline, API failure, empty data, signed out).
+- Say clearly what you ran and what you could not test. Never say something "works" or is "tested" unless you actually ran it. Say "not verified" instead.
+
+## 5. Review handoff
+
+At the end of every step, write a short **Review handoff** block that is self-contained (paste it plus the git diff into another AI for a second review):
+
+- Goal
+- Files changed
+- Key decisions
+- Known risks
+- Untested parts
+- The parts of the change you are least confident about

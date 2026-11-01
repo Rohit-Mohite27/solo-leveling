@@ -1,0 +1,9 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+# Push schema then serve (idempotent). Root Directory in Railway must be `backend`.
+startCommand = "npm run start:railway"
+healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"

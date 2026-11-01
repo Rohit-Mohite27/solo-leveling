@@ -1,0 +1,42 @@
+---
+description: "How to make and review changes"
+alwaysApply: true
+---
+
+# Movie Pass — Change Workflow
+
+## Before editing
+
+- For any non-trivial change, first state a short plan: which files you will touch and why.
+- If the change touches more than 3 files, or the request is ambiguous, wait for approval before editing.
+- If unsure how an endpoint behaves, read the existing code (frontend BFF under `app/api`, `lib/api`, `services/`; backend under `src/api`, `src/modules`) and any API docs. Do not guess endpoints, params or response shapes — ask.
+
+## While editing
+
+- Keep diffs small and focused: one concern per change.
+- No unrelated refactors, renames or formatting changes.
+- Do not edit anything outside the scope of the request.
+- Ask before deleting or renaming any file.
+- Ask before changing:
+  - `package.json` / `package-lock.json`
+  - `.env`, `.env.local`, `.env.example` or any file holding secrets
+  - `next.config.*`, Docker/Compose files, or Drizzle schema/migrations
+
+## After editing — review your own diff twice
+
+1. **Correctness:** bugs, typos, missing/unused imports, and broken callers of anything you changed (search for usages of renamed or re-typed functions, props and types).
+2. **Architecture:** the change follows `architecture.mdc` (UI → BFF/api client → backend modules; no secrets in client; no new deps without asking).
+
+## Verify
+
+- Frontend: `npx tsc --noEmit` and `npm run lint` when you touched TS/TSX.
+- Backend: `npm run typecheck` (and relevant `npm test` if you touched API/DB logic).
+- Fix any errors you introduced. Pre-existing errors in files you did not touch: mention them, do not fix them unasked.
+
+## Finish
+
+End with a 3–4 line summary:
+
+- Files changed
+- What changed
+- Anything you could not test (e.g. live payment, SMS OTP, BigTree)
