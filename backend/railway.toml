@@ -2,8 +2,8 @@
 builder = "NIXPACKS"
 
 [deploy]
-# Root Directory must be `backend`. Run schema push once manually if tables are missing.
-startCommand = "npm start"
+# Root Directory must be `backend`. Pushes schema (over TLS for TiDB) then serves.
+startCommand = "npm run start:railway"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
