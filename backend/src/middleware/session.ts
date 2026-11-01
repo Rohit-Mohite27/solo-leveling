@@ -1,5 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
-import { readCookie, SESSION_COOKIE, verifySessionToken } from "../lib/session.js";
+import {
+  readBearerToken,
+  readCookie,
+  SESSION_COOKIE,
+  verifySessionToken,
+} from "../lib/session.js";
 import { parseId } from "../lib/params.js";
 
 declare global {
@@ -10,9 +15,9 @@ declare global {
   }
 }
 
-/** Attach hunter_id from solo_session cookie when present. */
+/** Attach hunter_id from Bearer token or solo_session cookie. */
 export function attachSession(req: Request, _res: Response, next: NextFunction): void {
-  const token = readCookie(req, SESSION_COOKIE);
+  const token = readBearerToken(req) ?? readCookie(req, SESSION_COOKIE);
   if (token) {
     const payload = verifySessionToken(token);
     if (payload) req.hunter_id = payload.hunter_id;

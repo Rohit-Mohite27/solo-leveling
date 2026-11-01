@@ -58,12 +58,14 @@ export async function verifyOtp(req: Request, res: Response) {
       });
       return;
     }
-    setSessionCookie(res, data.hunter.id);
+    const session_token = setSessionCookie(res, data.hunter.id);
     res.json({
       success: true,
       data: {
         hunter: data.hunter,
         created: data.created,
+        // Returned because cross-site Vercel→Render often blocks third-party cookies
+        sessionToken: session_token,
       },
     });
   } catch (err) {

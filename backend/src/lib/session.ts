@@ -53,7 +53,8 @@ export function createSessionToken(hunter_id: number): string {
   return sign({ hunter_id, exp });
 }
 
-export function setSessionCookie(res: Response, hunter_id: number): void {
+/** Sets cookie and returns the JWT (also sent in JSON for cross-site Vercel→Render). */
+export function setSessionCookie(res: Response, hunter_id: number): string {
   const token = createSessionToken(hunter_id);
   const secure = env.NODE_ENV === "production";
   const same_site = secure ? "None" : "Lax";
@@ -67,9 +68,10 @@ export function setSessionCookie(res: Response, hunter_id: number): void {
       "HttpOnly",
       `Max-Age=${max_age}`,
       `SameSite=${same_site}`,
-      ...(secure ? ["Secure"] : []),
+      ...(secure ? ["Secure", "Partitioned"] : []),
     ].join("; "),
   );
+  return token;
 }
 
 export function clearSessionCookie(res: Response): void {
@@ -83,7 +85,7 @@ export function clearSessionCookie(res: Response): void {
       "HttpOnly",
       "Max-Age=0",
       `SameSite=${same_site}`,
-      ...(secure ? ["Secure"] : []),
+      ...(secure ? ["Secure", "Partitioned"] : []),
     ].join("; "),
   );
 }
@@ -99,4 +101,12 @@ export function readCookie(req: Request, name: string): string | null {
     return decodeURIComponent(part.slice(idx + 1).trim());
   }
   return null;
+}
+
+export function readBearerToken(req: Request): string | null {
+  const header = req.headers.authorization;
+  if (!header) return null;
+  const [scheme, token] = header.split(" ");
+  if (!scheme || !token || scheme.toLowerCase() !== "bearer") return null;
+  return token.trim();
 }

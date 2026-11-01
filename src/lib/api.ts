@@ -1,8 +1,10 @@
-/** Browser API client — always sends cookies for HttpOnly session. */
+/** Browser API client — cookie when possible, Bearer token fallback for cross-site. */
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000")
   .trim()
   .replace(/\/$/, "");
+
+const TOKEN_KEY = "solo_session_token";
 
 export type ApiHunter = {
   id: number;
@@ -54,7 +56,25 @@ export class ApiError extends Error {
   }
 }
 
+export function getSessionToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionToken(token: string | null): void {
+  try {
+    if (!token) sessionStorage.removeItem(TOKEN_KEY);
+    else sessionStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // ignore
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getSessionToken();
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -62,6 +82,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -82,6 +103,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok || !json || json.success !== true) {
     const err = json && "code" in json ? json : null;
+    if (res.status === 401) setSessionToken(null);
     const fallback =
       res.status === 502 || res.status === 503
         ? "API is starting up — wait a moment and try again"
@@ -104,14 +126,24 @@ export async function requestOtp(phone: string) {
 }
 
 export async function verifyOtp(input: { phone: string; otp: string; name: string }) {
-  return apiFetch<{ hunter: ApiHunter; created: boolean }>("/api/v1/auth/otp/verify", {
+  const data = await apiFetch<{
+    hunter: ApiHunter;
+    created: boolean;
+    sessionToken?: string;
+  }>("/api/v1/auth/otp/verify", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  if (data.sessionToken) setSessionToken(data.sessionToken);
+  return data;
 }
 
 export async function logoutApi() {
-  return apiFetch<{ ok: boolean }>("/api/v1/auth/logout", { method: "POST" });
+  try {
+    return await apiFetch<{ ok: boolean }>("/api/v1/auth/logout", { method: "POST" });
+  } finally {
+    setSessionToken(null);
+  }
 }
 
 export async function fetchMe() {
