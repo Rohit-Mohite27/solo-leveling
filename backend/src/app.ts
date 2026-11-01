@@ -65,10 +65,14 @@ export function createApp() {
         });
         return;
       }
+      const detail =
+        err instanceof Error && err.message
+          ? err.message.slice(0, 300)
+          : "Unexpected server error";
       res.status(500).json({
         success: false,
         code: "INTERNAL_ERROR",
-        message: "Unexpected server error",
+        message: detail,
       });
     },
   );

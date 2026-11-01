@@ -7,21 +7,25 @@ export async function upsertOtpChallenge(input: {
   code_hash: string;
   expires_at: Date;
 }) {
-  await db
-    .insert(otp_challenges)
-    .values({
-      phone: input.phone,
-      code_hash: input.code_hash,
-      expires_at: input.expires_at,
-      attempts: 0,
-    })
-    .onDuplicateKeyUpdate({
-      set: {
+  const existing = await findOtpChallenge(input.phone);
+  if (existing) {
+    await db
+      .update(otp_challenges)
+      .set({
         code_hash: input.code_hash,
         expires_at: input.expires_at,
         attempts: 0,
-      },
-    });
+      })
+      .where(eq(otp_challenges.phone, input.phone));
+    return;
+  }
+
+  await db.insert(otp_challenges).values({
+    phone: input.phone,
+    code_hash: input.code_hash,
+    expires_at: input.expires_at,
+    attempts: 0,
+  });
 }
 
 export async function findOtpChallenge(phone: string) {
