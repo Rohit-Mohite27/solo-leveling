@@ -2,8 +2,8 @@
 builder = "NIXPACKS"
 
 [deploy]
-# Root Directory must be `backend`. Pushes schema (over TLS for TiDB) then serves.
-startCommand = "npm run start:railway"
+# Root Directory must be `backend`. Create tables once via TiDB SQL Editor (scripts/init-schema.sql).
+startCommand = "npm start"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
