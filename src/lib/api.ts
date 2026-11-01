@@ -1,6 +1,8 @@
 /** Browser API client — always sends cookies for HttpOnly session. */
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000")
+  .trim()
+  .replace(/\/$/, "");
 
 export type ApiHunter = {
   id: number;
@@ -53,29 +55,38 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new ApiError(
+      "NETWORK_ERROR",
+      "Cannot reach the API (Render may be waking up — wait ~30s and retry)",
+      0,
+    );
+  }
 
   let json: ApiOk<T> | ApiErr | null = null;
   try {
     json = (await res.json()) as ApiOk<T> | ApiErr;
   } catch {
-    // non-JSON
+    // non-JSON (e.g. Render 502 HTML)
   }
 
   if (!res.ok || !json || json.success !== true) {
     const err = json && "code" in json ? json : null;
-    throw new ApiError(
-      err?.code ?? "HTTP_ERROR",
-      err?.message ?? `Request failed (${res.status})`,
-      res.status,
-    );
+    const fallback =
+      res.status === 502 || res.status === 503
+        ? "API is starting up — wait a moment and try again"
+        : `Request failed (${res.status})`;
+    throw new ApiError(err?.code ?? "HTTP_ERROR", err?.message ?? fallback, res.status);
   }
 
   return json.data;

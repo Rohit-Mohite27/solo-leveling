@@ -121,16 +121,21 @@ export default function GatePage() {
             <label className="sr-only" htmlFor="hunter-phone">
               Mobile number
             </label>
-            <input
-              id="hunter-phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              placeholder="10-digit mobile"
-              inputMode="numeric"
-              className="soft-card w-full rounded-2xl border-0 px-4 py-3 text-center font-body text-base font-semibold tracking-wider text-ink-900 outline-none ring-1 ring-lilac-200 placeholder:text-ink-700/35 focus:ring-lilac-400"
-              autoComplete="tel"
-              disabled={!ready || busy}
-            />
+            <div className="soft-card flex w-full items-center gap-2 rounded-2xl px-3 py-2 ring-1 ring-lilac-200 focus-within:ring-lilac-400">
+              <span className="shrink-0 pl-1 font-body text-base font-bold text-ink-700/70">
+                +91
+              </span>
+              <input
+                id="hunter-phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                placeholder="10-digit mobile"
+                inputMode="numeric"
+                className="w-full border-0 bg-transparent py-2 text-center font-body text-base font-semibold tracking-wider text-ink-900 outline-none placeholder:text-ink-700/35"
+                autoComplete="tel-national"
+                disabled={!ready || busy}
+              />
+            </div>
             <button
               type="submit"
               disabled={!ready || busy}
