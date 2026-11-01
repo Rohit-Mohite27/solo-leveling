@@ -1,10 +1,20 @@
-import { generateOtpCode, hashOtp, normalizePhone, otpMatches, sendOtpSms } from "../../lib/otp.js";
+import { env } from "../../config/env.js";
+import {
+  generateOtpCode,
+  hashOtp,
+  normalizePhone,
+  otpMatches,
+  sendMsg91WidgetOtp,
+  sendOtpSms,
+  verifyMsg91WidgetOtp,
+} from "../../lib/otp.js";
 import * as huntersRepository from "../hunters/hunters.repository.js";
 import * as questsRepository from "../quests/quests.repository.js";
 import * as authRepository from "./auth.repository.js";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+const MSG91_REQ_PREFIX = "msg91:";
 
 const STARTER_QUESTS = [
   { name: "Push-ups", kind: "count" as const, target: "50", unit: "reps", accent: "#7c6cf0", sort_order: 0 },
@@ -30,10 +40,25 @@ export async function requestOtp(raw_phone: string) {
     throw new AuthError("INVALID_PHONE", "Enter a valid 10-digit Indian mobile number");
   }
 
-  const code = generateOtpCode();
-  const code_hash = hashOtp(phone, code);
   const expires_at = new Date(Date.now() + OTP_TTL_MS);
 
+  if (env.OTP_MODE === "msg91") {
+    try {
+      const req_id = await sendMsg91WidgetOtp(phone);
+      await authRepository.upsertOtpChallenge({
+        phone,
+        code_hash: `${MSG91_REQ_PREFIX}${req_id}`,
+        expires_at,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "SMS send failed";
+      throw new AuthError("OTP_SEND_FAILED", message, 502);
+    }
+    return { phone, expires_in_sec: Math.floor(OTP_TTL_MS / 1000) };
+  }
+
+  const code = generateOtpCode();
+  const code_hash = hashOtp(phone, code);
   await authRepository.upsertOtpChallenge({ phone, code_hash, expires_at });
   await sendOtpSms(phone, code);
 
@@ -71,7 +96,15 @@ export async function verifyOtp(input: { phone: string; otp: string; name: strin
     throw new AuthError("OTP_LOCKED", "Too many attempts — request a new OTP", 429);
   }
 
-  if (!otpMatches(phone, otp, challenge.code_hash)) {
+  if (challenge.code_hash.startsWith(MSG91_REQ_PREFIX)) {
+    const req_id = challenge.code_hash.slice(MSG91_REQ_PREFIX.length);
+    try {
+      await verifyMsg91WidgetOtp(req_id, otp);
+    } catch {
+      await authRepository.bumpOtpAttempts(phone, challenge.attempts + 1);
+      throw new AuthError("OTP_INVALID", "Incorrect OTP", 401);
+    }
+  } else if (!otpMatches(phone, otp, challenge.code_hash)) {
     await authRepository.bumpOtpAttempts(phone, challenge.attempts + 1);
     throw new AuthError("OTP_INVALID", "Incorrect OTP", 401);
   }

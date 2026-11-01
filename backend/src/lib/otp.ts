@@ -3,7 +3,6 @@ import { env } from "../config/env.js";
 
 export function normalizePhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
-  // Accept 10-digit local or 91XXXXXXXXXX
   if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) return digits;
   if (digits.length === 12 && digits.startsWith("91") && /^91[6-9]\d{9}$/.test(digits)) {
     return digits.slice(2);
@@ -29,30 +28,93 @@ export function otpMatches(phone: string, code: string, code_hash: string): bool
   return timingSafeEqual(next, prev);
 }
 
-/** Send OTP via MSG91 (or log in static mode). */
-export async function sendOtpSms(phone: string, code: string): Promise<void> {
-  if (env.OTP_MODE === "static") {
-    console.log(`[otp:static] phone=${phone} code=${code}`);
-    return;
-  }
+type Msg91Json = {
+  type?: string;
+  message?: string | Record<string, unknown>;
+  reqId?: string;
+};
 
-  const mobile = `${env.MSG91_COUNTRY_CODE}${phone}`;
-  const url = "https://control.msg91.com/api/v5/otp";
-  const res = await fetch(url, {
+function msg91Headers(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    authkey: env.MSG91_AUTH_KEY,
+  };
+}
+
+function extractReqId(json: Msg91Json): string | null {
+  if (typeof json.reqId === "string" && json.reqId) return json.reqId;
+  if (typeof json.message === "string" && json.message) return json.message;
+  return null;
+}
+
+/**
+ * MSG91 OTP Widget — MSG91 generates & sends the SMS.
+ * Returns reqId to store for verify.
+ */
+export async function sendMsg91WidgetOtp(phone: string): Promise<string> {
+  const identifier = `${env.MSG91_COUNTRY_CODE}${phone}`;
+  const res = await fetch("https://control.msg91.com/api/v5/widget/sendOtp", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      authkey: env.MSG91_AUTH_KEY,
-    },
+    headers: msg91Headers(),
     body: JSON.stringify({
-      template_id: env.MSG91_TEMPLATE_ID,
-      mobile,
-      otp: code,
+      widgetId: env.MSG91_WIDGET_ID,
+      identifier,
     }),
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`MSG91 OTP send failed (${res.status}): ${text.slice(0, 200)}`);
+  const text = await res.text().catch(() => "");
+  let json: Msg91Json = {};
+  try {
+    json = JSON.parse(text) as Msg91Json;
+  } catch {
+    // non-JSON
   }
+
+  // Widget API often returns HTTP 200 with type:"error"
+  if (!res.ok || json.type === "error") {
+    const detail =
+      typeof json.message === "string" ? json.message : text.slice(0, 200) || `HTTP ${res.status}`;
+    throw new Error(
+      `MSG91 send failed: ${detail}. Check auth key, widget id, IP whitelist (disable IP security on authkey for Render), and KYC/demo mode.`,
+    );
+  }
+
+  const req_id = extractReqId(json);
+  if (!req_id) {
+    throw new Error(`MSG91 send succeeded but no reqId in response: ${text.slice(0, 200)}`);
+  }
+  return req_id;
+}
+
+/** Verify OTP with MSG91 Widget using reqId from send. */
+export async function verifyMsg91WidgetOtp(req_id: string, otp: string): Promise<void> {
+  const res = await fetch("https://control.msg91.com/api/v5/widget/verifyOtp", {
+    method: "POST",
+    headers: msg91Headers(),
+    body: JSON.stringify({
+      widgetId: env.MSG91_WIDGET_ID,
+      otp,
+      reqId: req_id,
+    }),
+  });
+
+  const text = await res.text().catch(() => "");
+  let json: Msg91Json = {};
+  try {
+    json = JSON.parse(text) as Msg91Json;
+  } catch {
+    // non-JSON
+  }
+
+  if (!res.ok || json.type === "error") {
+    const detail =
+      typeof json.message === "string" ? json.message : text.slice(0, 200) || `HTTP ${res.status}`;
+    throw new Error(detail);
+  }
+}
+
+/** Dev-only: log static OTP. */
+export async function sendOtpSms(phone: string, code: string): Promise<void> {
+  console.log(`[otp:static] phone=${phone} code=${code}`);
 }

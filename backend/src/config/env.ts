@@ -9,11 +9,14 @@ const env_schema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   /** HMAC secret for session JWT cookie */
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
-  /** static = fixed OTP for local/dev; msg91 = real SMS */
+  /** static = fixed OTP for local/dev; msg91 = real SMS via OTP Widget */
   OTP_MODE: z.enum(["static", "msg91"]).default("static"),
   /** Used when OTP_MODE=static */
   STATIC_OTP: z.string().regex(/^\d{4,8}$/).default("123456"),
   MSG91_AUTH_KEY: z.string().optional().default(""),
+  /** OTP Widget ID from MSG91 dashboard (not SMS template id) */
+  MSG91_WIDGET_ID: z.string().optional().default(""),
+  /** Legacy / unused when using widget */
   MSG91_TEMPLATE_ID: z.string().optional().default(""),
   /** Country dial code digits, e.g. 91 for India */
   MSG91_COUNTRY_CODE: z.string().default("91"),
@@ -28,8 +31,8 @@ if (!parsed.success) {
 
 const data = parsed.data;
 
-if (data.OTP_MODE === "msg91" && (!data.MSG91_AUTH_KEY || !data.MSG91_TEMPLATE_ID)) {
-  console.error("OTP_MODE=msg91 requires MSG91_AUTH_KEY and MSG91_TEMPLATE_ID");
+if (data.OTP_MODE === "msg91" && (!data.MSG91_AUTH_KEY || !data.MSG91_WIDGET_ID)) {
+  console.error("OTP_MODE=msg91 requires MSG91_AUTH_KEY and MSG91_WIDGET_ID");
   throw new Error("Backend environment validation failed");
 }
 
@@ -50,7 +53,6 @@ export function isAllowedCorsOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
   const allowed = corsOrigins();
   if (allowed.includes(origin)) return true;
-  // Vercel gives a new *.vercel.app host per deploy; allow this project's hosts.
   try {
     const url = new URL(origin);
     if (url.protocol !== "https:") return false;
