@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { corsOrigins } from "./config/env.js";
+import { isAllowedCorsOrigin } from "./config/env.js";
 import { attachSession } from "./middleware/session.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
@@ -16,12 +16,13 @@ export function createApp() {
   app.use(
     cors({
       origin(origin, callback) {
-        const allowed = corsOrigins();
-        if (!origin || allowed.includes(origin)) {
+        if (isAllowedCorsOrigin(origin)) {
           callback(null, true);
           return;
         }
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+        console.warn(`[cors] blocked origin: ${origin ?? "(none)"}`);
+        // false = deny without throwing (throwing became a browser "network error")
+        callback(null, false);
       },
       credentials: true,
     }),
@@ -50,15 +51,6 @@ export function createApp() {
       _next: express.NextFunction,
     ) => {
       console.error(err);
-      const message = err instanceof Error ? err.message : "Unexpected server error";
-      if (message.startsWith("CORS blocked")) {
-        res.status(403).json({
-          success: false,
-          code: "CORS_BLOCKED",
-          message,
-        });
-        return;
-      }
       // body-parser JSON failures
       if (
         typeof err === "object" &&

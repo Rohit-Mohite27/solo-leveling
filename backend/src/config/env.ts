@@ -44,3 +44,21 @@ export const env = data;
 export function corsOrigins(): string[] {
   return env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
 }
+
+/** Exact CORS_ORIGIN entries, plus Vercel preview/prod aliases for this app. */
+export function isAllowedCorsOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  const allowed = corsOrigins();
+  if (allowed.includes(origin)) return true;
+  // Vercel gives a new *.vercel.app host per deploy; allow this project's hosts.
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname;
+    if (host === "solo-leveling-azure-rho.vercel.app") return true;
+    if (host.endsWith(".vercel.app") && host.startsWith("solo-leveling")) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
