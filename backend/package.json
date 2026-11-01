@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "start:railway": "drizzle-kit push --force && tsx src/server.ts",
+    "start:railway": "tsx src/server.ts",
+    "start:with-migrate": "drizzle-kit push --force && tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
