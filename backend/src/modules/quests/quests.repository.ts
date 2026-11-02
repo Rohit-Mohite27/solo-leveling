@@ -10,6 +10,14 @@ export async function findQuestsByHunterId(hunter_id: number) {
     .orderBy(asc(quests.sort_order), asc(quests.id));
 }
 
+/** One-shot rename for hunters seeded with the old Gym Session starter. */
+export async function renameGymSessionToNoFap(hunter_id: number) {
+  await db
+    .update(quests)
+    .set({ name: "No Fap", kind: "yesno", target: "1", unit: "done", accent: "#e85a7a" })
+    .where(and(eq(quests.hunter_id, hunter_id), eq(quests.name, "Gym Session"), eq(quests.is_active, true)));
+}
+
 export async function insertQuest(values: {
   hunter_id: number;
   name: string;

@@ -43,9 +43,35 @@ export const STARTER_QUESTS: Quest[] = [
   { id: "q1", name: "Push-ups", kind: "count", target: 50, unit: "reps", accent: "#7c6cf0" },
   { id: "q2", name: "Sit-ups", kind: "count", target: 50, unit: "reps", accent: "#5b9cf5" },
   { id: "q3", name: "Run", kind: "distance", target: 3, unit: "km", accent: "#f0a05a" },
-  { id: "q4", name: "Gym Session", kind: "yesno", target: 1, unit: "done", accent: "#5ec4a8" },
+  // Yes/No only — tap Done when you held the line today (no count)
+  { id: "q4", name: "No Fap", kind: "yesno", target: 1, unit: "done", accent: "#e85a7a" },
+  // Optional steps bar — does not count toward streak / day clear
   { id: "q5", name: "Steps", kind: "steps", target: 10000, unit: "steps", accent: "#5ec4a8" },
 ];
+
+/** Rename legacy Gym → No Fap; ensure default Steps bar is present. */
+export function migrateStarterQuests(quests: Quest[]): Quest[] {
+  const next = quests.map((q) => {
+    if (q.id === "q4" || q.name === "Gym Session") {
+      return {
+        ...q,
+        id: q.id || "q4",
+        name: "No Fap",
+        kind: "yesno" as const,
+        target: 1,
+        unit: "done",
+        accent: q.accent === "#5ec4a8" ? "#e85a7a" : q.accent,
+      };
+    }
+    return q;
+  });
+  const hasSteps = next.some((q) => q.kind === "steps" || q.unit === "steps" || q.id === "q5");
+  if (!hasSteps) {
+    const steps = STARTER_QUESTS.find((q) => q.id === "q5");
+    if (steps) next.push(steps);
+  }
+  return next;
+}
 
 /** Default steps goal when adding from Quest Board */
 export const DEFAULT_STEPS_TARGET = 10000;
@@ -384,7 +410,10 @@ export function formatDayLabel(key: string): { day: number; weekday: string; mon
 }
 
 export function questTargetLabel(quest: Quest): string {
-  if (quest.kind === "yesno") return "Done / Skip";
+  if (quest.kind === "yesno") {
+    if (/fap/i.test(quest.name)) return "Tap when you held today — no count";
+    return "Tap Done — no count";
+  }
   if (quest.kind === "steps") {
     return `${quest.target.toLocaleString()} ${quest.unit}`;
   }

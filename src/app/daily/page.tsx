@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { IncompleteTasksModal } from "@/components/IncompleteTasksModal";
 import { useHunter } from "@/lib/hunter-store";
 import type { Quest } from "@/lib/demo-data";
 
@@ -85,6 +86,7 @@ export default function DailyPage() {
   const hunter = useHunter();
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
+  const [incompleteOpen, setIncompleteOpen] = useState(false);
 
   useEffect(() => {
     if (hunter.hydrated && !hunter.entered) {
@@ -100,14 +102,14 @@ export default function DailyPage() {
     );
   }
 
-  function handleSubmit() {
-    const wasAllClear = hunter.allCleared;
-    hunter.submitDay();
-    setToast(
-      wasAllClear
-        ? "Quest Complete — XP awarded. Streak updated."
-        : "Logged. Partial / incomplete days break the streak.",
-    );
+  async function handleSubmit() {
+    const result = await hunter.submitDay();
+    if (result.blocked) {
+      setIncompleteOpen(true);
+      setToast(null);
+      return;
+    }
+    setToast("Quest Complete — XP awarded. Streak updated.");
   }
 
   return (
@@ -165,6 +167,8 @@ export default function DailyPage() {
           {toast}
         </p>
       )}
+
+      <IncompleteTasksModal open={incompleteOpen} onClose={() => setIncompleteOpen(false)} />
     </section>
   );
 }

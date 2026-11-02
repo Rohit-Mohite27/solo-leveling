@@ -16,7 +16,7 @@ const STARTER_QUESTS = [
   { name: "Push-ups", kind: "count" as const, target: "50", unit: "reps", accent: "#7c6cf0", sort_order: 0 },
   { name: "Sit-ups", kind: "count" as const, target: "50", unit: "reps", accent: "#5b9cf5", sort_order: 1 },
   { name: "Run", kind: "distance" as const, target: "3", unit: "km", accent: "#f0a05a", sort_order: 2 },
-  { name: "Gym Session", kind: "yesno" as const, target: "1", unit: "done", accent: "#5ec4a8", sort_order: 3 },
+  { name: "No Fap", kind: "yesno" as const, target: "1", unit: "done", accent: "#e85a7a", sort_order: 3 },
   { name: "Steps", kind: "steps" as const, target: "10000", unit: "steps", accent: "#5ec4a8", sort_order: 4 },
 ];
 

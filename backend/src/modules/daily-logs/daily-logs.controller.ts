@@ -46,6 +46,25 @@ export async function submitToday(req: Request, res: Response) {
     res.status(400).json({ success: false, code: "INVALID_ID", message: "Invalid hunter id" });
     return;
   }
-  const data = await dailyLogsService.submitToday(hunter_id);
-  res.json({ success: true, data });
+  try {
+    const data = await dailyLogsService.submitToday(hunter_id);
+    res.json({ success: true, data });
+  } catch (err) {
+    const code =
+      err instanceof Error && "code" in err
+        ? String((err as Error & { code?: string }).code ?? "")
+        : "";
+    if (code === "TASKS_INCOMPLETE") {
+      res.status(400).json({
+        success: false,
+        code: "TASKS_INCOMPLETE",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Complete all assigned tasks before submitting the day",
+      });
+      return;
+    }
+    throw err;
+  }
 }

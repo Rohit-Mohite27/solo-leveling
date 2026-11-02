@@ -13,6 +13,7 @@ import {
   ALLIES,
   DEMO_TESTING,
   STARTER_QUESTS,
+  migrateStarterQuests,
   allyAscension,
   allyForLevel,
   ascensionXpBonus,
@@ -80,7 +81,7 @@ type HunterContextValue = HunterState & {
   toggleQuestDone: (questId: string) => void;
   setLogValue: (questId: string, value: number) => void;
   markYesNo: (questId: string, done: boolean) => void;
-  submitDay: () => Promise<{ leveled: boolean; newLevel: number }>;
+  submitDay: () => Promise<{ leveled: boolean; newLevel: number; blocked?: boolean }>;
   dismissAlly: () => void;
   addQuest: (quest: Omit<Quest, "id">) => void;
   updateQuestTarget: (questId: string, target: number) => void;
@@ -236,7 +237,9 @@ export function HunterProvider({ children }: { children: ReactNode }) {
           if (raw) {
             const parsed = JSON.parse(raw) as HunterState;
             const key = todayKey();
-            const quests = parsed.quests?.length ? parsed.quests : STARTER_QUESTS;
+            const quests = migrateStarterQuests(
+              parsed.quests?.length ? parsed.quests : STARTER_QUESTS,
+            );
             setState({
               ...defaultState(),
               ...parsed,
@@ -399,6 +402,15 @@ export function HunterProvider({ children }: { children: ReactNode }) {
     let leveled = false;
     let newLevel = 0;
 
+    // Must clear every core quest before the System accepts the day.
+    const coreNow = coreQuests(state.quests);
+    const readyToSubmit =
+      coreNow.length > 0 &&
+      coreNow.every((q) => state.today.logs[q.id]?.cleared);
+    if (!readyToSubmit) {
+      return { leveled: false, newLevel: 0, blocked: true };
+    }
+
     if (!DEMO_TESTING && state.hunterId) {
       try {
         const result = await submitTodayApi(state.hunterId);
@@ -506,7 +518,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
     });
 
     return { leveled, newLevel };
-  }, [state.hunterId, state.level]);
+  }, [state.hunterId, state.level, state.quests, state.today.logs]);
 
   const dismissAlly = useCallback(() => {
     setState((s) => ({ ...s, pendingAlly: null }));

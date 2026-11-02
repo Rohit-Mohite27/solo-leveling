@@ -44,7 +44,15 @@ export function GoalCard({ quest, done, locked = false, onToggle }: Props) {
 
       <p className="mt-4 font-body text-sm font-bold text-lilac-400">{quest.name}</p>
       <p className="mt-1 font-display text-2xl font-semibold text-ink-900">
-        {done ? "Done" : "Not done"}
+        {quest.kind === "yesno"
+          ? done
+            ? /fap/i.test(quest.name)
+              ? "Held"
+              : "Done"
+            : "Mark done"
+          : done
+            ? "Done"
+            : "Not done"}
       </p>
       <p className="mt-1 text-xs font-semibold text-ink-700/45">{questTargetLabel(quest)}</p>
     </button>
@@ -66,6 +74,20 @@ function GoalIcon({ name }: { name: string }) {
           strokeLinejoin="round"
         />
         <path d="M8 12l3 1 2-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (n.includes("fap") || n.includes("nofap") || n.includes("no fap")) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 3l2.2 4.5 5 .7-3.6 3.5.9 5L12 14.8 7.5 16.7l.9-5L4.8 8.2l5-.7L12 3z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+          fill="currentColor"
+          fillOpacity="0.2"
+        />
       </svg>
     );
   }

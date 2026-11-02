@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GateRing } from "@/components/GateRing";
+import { DEMO_TESTING } from "@/lib/demo-data";
 import { ApiError, requestOtp, verifyOtp } from "@/lib/api";
 import { useHunter } from "@/lib/hunter-store";
 
 type Step = "profile" | "otp";
 
 export default function GatePage() {
-  const { completeAuth, hydrated, apiReady, entered, authError } = useHunter();
+  const { completeAuth, enterGate, hydrated, apiReady, entered, authError } = useHunter();
   const router = useRouter();
   const [step, setStep] = useState<Step>("profile");
   const [name, setName] = useState("");
@@ -23,6 +24,18 @@ export default function GatePage() {
       router.replace("/status");
     }
   }, [hydrated, entered, router]);
+
+  function handleDemoEnter(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Enter your hunter name");
+      return;
+    }
+    enterGate(trimmed);
+    router.push("/status");
+  }
 
   async function handleRequestOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -100,7 +113,36 @@ export default function GatePage() {
           Your goals. Your streak. Rise against yourself.
         </p>
 
-        {step === "profile" ? (
+        {DEMO_TESTING ? (
+          <form
+            onSubmit={handleDemoEnter}
+            className="mt-10 flex w-full max-w-sm animate-fade-up flex-col gap-3"
+            style={{ animationDelay: "0.4s" }}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-lilac-400">
+              Demo mode — no OTP / API
+            </p>
+            <label className="sr-only" htmlFor="hunter-name">
+              Hunter name
+            </label>
+            <input
+              id="hunter-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name (e.g. Rohit)"
+              className="soft-card w-full rounded-2xl border-0 px-4 py-3 text-center font-body text-base font-semibold text-ink-900 outline-none ring-1 ring-lilac-200 placeholder:text-ink-700/35 focus:ring-lilac-400"
+              autoComplete="nickname"
+              disabled={!ready || busy}
+            />
+            <button
+              type="submit"
+              disabled={!ready || busy}
+              className="min-h-12 rounded-2xl bg-lilac-500 font-body text-sm font-bold uppercase tracking-[0.2em] text-white shadow-pill transition hover:bg-lilac-600 disabled:opacity-40"
+            >
+              Enter the Gate
+            </button>
+          </form>
+        ) : step === "profile" ? (
           <form
             onSubmit={handleRequestOtp}
             className="mt-10 flex w-full max-w-sm animate-fade-up flex-col gap-3"

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArmyTeaser } from "@/components/ArmyTeaser";
 import { DateStrip } from "@/components/DateStrip";
 import { GoalCard } from "@/components/GoalCard";
+import { IncompleteTasksModal } from "@/components/IncompleteTasksModal";
 import { StepsGoalCard } from "@/components/StepsGoalCard";
 import { HunterMascot } from "@/components/HunterMascot";
 import { forceMidnightWarning } from "@/components/StreakWarningOverlay";
@@ -15,6 +16,7 @@ import { useHunter } from "@/lib/hunter-store";
 export default function StatusPage() {
   const hunter = useHunter();
   const router = useRouter();
+  const [incompleteOpen, setIncompleteOpen] = useState(false);
 
   useEffect(() => {
     if (hunter.hydrated && !hunter.entered) {
@@ -36,6 +38,11 @@ export default function StatusPage() {
     core.length === 0 ? 0 : Math.round((selectedDone / core.length) * 100);
   const canEdit = hunter.isTodaySelected && (DEMO_TESTING || !hunter.today.submitted);
 
+  async function handleSubmitDay() {
+    const result = await hunter.submitDay();
+    if (result.blocked) setIncompleteOpen(true);
+  }
+
   return (
     <section className="mx-auto w-full max-w-lg px-4 pb-8 pt-2 sm:px-5">
       <DateStrip selectedDate={hunter.selectedDate} onSelect={hunter.selectDate} />
@@ -47,8 +54,16 @@ export default function StatusPage() {
           <span className="text-lilac-500">({selectedPct}%)</span>
         </h1>
         <p className="mt-1 font-body text-sm font-semibold text-ink-700/55">
-          {hunter.name || "Sung Jinwoo"} · Level {hunter.level} · {hunter.streak} day streak
+          {hunter.name || "Sung Jinwoo"} · Level {hunter.level}
         </p>
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500/15 to-rose-500/15 px-3 py-1 ring-1 ring-orange-400/35">
+          <span aria-hidden className="text-base leading-none">
+            🔥
+          </span>
+          <span className="font-body text-sm font-bold text-orange-700">
+            {hunter.streak} day streak
+          </span>
+        </div>
       </div>
 
       <ArmyTeaser level={hunter.level} />
@@ -75,7 +90,7 @@ export default function StatusPage() {
           {canEdit && (
             <button
               type="button"
-              onClick={() => hunter.submitDay()}
+              onClick={() => void handleSubmitDay()}
               disabled={hunter.quests.length === 0}
               className="rounded-full bg-lilac-500 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-pill transition hover:bg-lilac-600 disabled:opacity-40"
             >
@@ -84,6 +99,8 @@ export default function StatusPage() {
           )}
         </div>
       </div>
+
+      <IncompleteTasksModal open={incompleteOpen} onClose={() => setIncompleteOpen(false)} />
 
       {DEMO_TESTING && (
         <div className="soft-card mt-4 rounded-[1.25rem] px-4 py-3">
@@ -120,8 +137,20 @@ export default function StatusPage() {
         </div>
       )}
 
+      <div className="mt-6 flex items-center justify-between gap-3 animate-fade-up" style={{ animationDelay: "0.12s" }}>
+        <p className="font-body text-sm font-bold text-ink-900">Today&apos;s tasks</p>
+        <Link
+          href="/board"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-lilac-500 text-xl font-light leading-none text-white shadow-pill transition hover:bg-lilac-600"
+          aria-label="Add more tasks"
+          title="Add task"
+        >
+          +
+        </Link>
+      </div>
+
       <div
-        className="mt-6 grid grid-cols-2 gap-3 animate-fade-up"
+        className="mt-3 grid grid-cols-2 gap-3 animate-fade-up"
         style={{ animationDelay: "0.14s" }}
       >
         {hunter.quests.map((quest) =>

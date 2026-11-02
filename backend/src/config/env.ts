@@ -58,14 +58,28 @@ export function corsOrigins(): string[] {
   return env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+function isPrivateLanHost(hostname: string): boolean {
+  if (hostname === "localhost" || hostname === "127.0.0.1") return true;
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+  const m = /^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(hostname);
+  if (m) {
+    const second = Number(m[1]);
+    return second >= 16 && second <= 31;
+  }
+  return false;
+}
+
 export function isAllowedCorsOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
   const allowed = corsOrigins();
   if (allowed.includes(origin)) return true;
   try {
     const url = new URL(origin);
-    if (url.protocol !== "https:") return false;
     const host = url.hostname;
+    // Local/LAN frontends (e.g. http://192.168.x.x:3000) while developing
+    if (env.NODE_ENV === "development" && isPrivateLanHost(host)) return true;
+    if (url.protocol !== "https:") return false;
     if (host === "solo-leveling-azure-rho.vercel.app") return true;
     if (host.endsWith(".vercel.app") && host.startsWith("solo-leveling")) return true;
   } catch {

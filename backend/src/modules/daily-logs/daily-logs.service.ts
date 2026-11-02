@@ -71,10 +71,17 @@ export async function submitToday(hunter_id: number) {
           : "partial";
 
   const all_clear = status === "complete";
+  // Do not accept a partial / empty day — member must finish assigned core tasks first.
+  if (!all_clear) {
+    const err = new Error("Complete all assigned tasks before submitting the day");
+    (err as Error & { code?: string }).code = "TASKS_INCOMPLETE";
+    throw err;
+  }
+
   let xp_gain = cleared_core * 25;
-  if (all_clear) xp_gain += 40;
-  const next_streak = all_clear ? hunter.streak + 1 : 0;
-  if (all_clear && next_streak > 1) xp_gain += Math.min(50, next_streak * 5);
+  xp_gain += 40;
+  const next_streak = hunter.streak + 1;
+  if (next_streak > 1) xp_gain += Math.min(50, next_streak * 5);
 
   let level = hunter.level;
   let xp = hunter.xp + xp_gain;
