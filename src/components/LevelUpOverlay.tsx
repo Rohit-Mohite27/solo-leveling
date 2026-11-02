@@ -5,6 +5,7 @@ import {
   allyAscension,
   allyPower,
   ascensionLabel,
+  firstName,
   personalizeLine,
 } from "@/lib/demo-data";
 import { useHunter } from "@/lib/hunter-store";
@@ -19,7 +20,7 @@ export function LevelUpOverlay() {
 
   if (!pendingAlly) return null;
 
-  const hunterName = name?.trim() || "Rohit";
+  const hunterName = firstName(name);
   const line = personalizeLine(pendingAlly.line, hunterName);
   const art = pendingAlly.image || "/characters/ally-jinho.png";
   const accent = pendingAlly.accent;

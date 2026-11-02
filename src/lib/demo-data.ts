@@ -369,9 +369,17 @@ export function armyStats(level: number): {
   };
 }
 
-/** Fill {name} in ally greeting lines with the hunter's name */
+/** First word of a full name — "Rohit Mohite" → "Rohit" (how the System addresses you). */
+export function firstName(fullName: string | null | undefined): string {
+  const trimmed = fullName?.trim() ?? "";
+  if (!trimmed) return "Hunter";
+  const first = trimmed.split(/\s+/)[0] ?? trimmed;
+  return first || "Hunter";
+}
+
+/** Fill {name} in ally greeting lines with the hunter's first name */
 export function personalizeLine(line: string, hunterName: string): string {
-  return line.replaceAll("{name}", hunterName || "Hunter");
+  return line.replaceAll("{name}", firstName(hunterName));
 }
 
 /** Demo / testing: skip locking the day so you can re-clear endlessly */

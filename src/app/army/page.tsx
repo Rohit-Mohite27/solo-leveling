@@ -11,6 +11,7 @@ import {
   allyPower,
   ascensionLabel,
   armyStats,
+  firstName,
   type Ally,
   type AllyFaction,
 } from "@/lib/demo-data";
@@ -46,7 +47,7 @@ export default function ArmyPage() {
     );
   }
 
-  const hunterName = hunter.name?.trim() || "Rohit";
+  const hunterName = firstName(hunter.name);
 
   return (
     <section className="mx-auto w-full max-w-lg px-4 pb-8 pt-2 sm:px-5">

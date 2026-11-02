@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { DEMO_TESTING } from "@/lib/demo-data";
+import { DEMO_TESTING, firstName } from "@/lib/demo-data";
 import { useHunter } from "@/lib/hunter-store";
 
 /** Milliseconds until next midnight Asia/Kolkata */
@@ -139,7 +139,7 @@ export function StreakWarningOverlay() {
             id="streak-warning-title"
             className="mt-3 font-display text-[1.7rem] font-semibold leading-tight text-ink-900 md:text-3xl"
           >
-            {hunter.name || "Rohit"}, you&apos;re missing{" "}
+            {firstName(hunter.name)}, you&apos;re missing{" "}
             {missing.length === 1 ? "this one task" : `${missing.length} tasks`}
           </h2>
           <p className="mt-3 font-body text-base font-semibold leading-relaxed text-ink-700/75">

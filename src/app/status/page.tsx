@@ -10,7 +10,7 @@ import { IncompleteTasksModal } from "@/components/IncompleteTasksModal";
 import { StepsGoalCard } from "@/components/StepsGoalCard";
 import { HunterMascot } from "@/components/HunterMascot";
 import { forceMidnightWarning } from "@/components/StreakWarningOverlay";
-import { DEMO_TESTING, coreQuests, isStepsQuest } from "@/lib/demo-data";
+import { DEMO_TESTING, coreQuests, firstName, isStepsQuest } from "@/lib/demo-data";
 import { useHunter } from "@/lib/hunter-store";
 
 export default function StatusPage() {
@@ -54,7 +54,7 @@ export default function StatusPage() {
           <span className="text-lilac-500">({selectedPct}%)</span>
         </h1>
         <p className="mt-1 font-body text-sm font-semibold text-ink-700/55">
-          {hunter.name || "Sung Jinwoo"} · Level {hunter.level}
+          {firstName(hunter.name)} · Level {hunter.level}
         </p>
         <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500/15 to-rose-500/15 px-3 py-1 ring-1 ring-orange-400/35">
           <span aria-hidden className="text-base leading-none">
