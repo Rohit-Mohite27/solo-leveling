@@ -7,6 +7,7 @@ import { AdminShell } from "@/components/AdminShell";
 import { useAdminGuard } from "@/hooks/useAdminGuard";
 import {
   AdminApiError,
+  deleteAdminHunter,
   fetchAdminHunter,
   resetAdminHunter,
   type AdminHunterDetail,
@@ -20,6 +21,7 @@ export default function AdminHunterDetailPage() {
   const [data, setData] = useState<AdminHunterDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(id)) {
@@ -54,6 +56,30 @@ export default function AdminHunterDetailPage() {
       setError(err instanceof AdminApiError ? err.message : "Reset failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleRemove() {
+    if (!data) return;
+    const ok = window.confirm(
+      `Remove ${data.hunter.name} permanently?\n\nThis deletes their account, quests, and daily logs. This cannot be undone.`,
+    );
+    if (!ok) return;
+    const typed = window.prompt(
+      `Type REMOVE to confirm deleting ${data.hunter.name}:`,
+    );
+    if (typed?.trim().toUpperCase() !== "REMOVE") {
+      setError("Removal cancelled — type REMOVE to confirm.");
+      return;
+    }
+    setRemoving(true);
+    setError(null);
+    try {
+      await deleteAdminHunter(id);
+      router.replace("/admin/hunters");
+    } catch (err) {
+      setError(err instanceof AdminApiError ? err.message : "Remove failed");
+      setRemoving(false);
     }
   }
 
@@ -96,14 +122,24 @@ export default function AdminHunterDetailPage() {
             <p className="mt-1 text-sm font-semibold text-ink-700/55">
               Level {data.hunter.level} · {data.hunter.xp} XP · {data.hunter.streak} day streak
             </p>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleReset()}
-              className="mt-5 min-h-11 w-full rounded-2xl bg-system-danger/10 text-sm font-bold uppercase tracking-wide text-system-danger ring-1 ring-system-danger/30 transition hover:bg-system-danger/15 disabled:opacity-40"
-            >
-              {busy ? "Resetting…" : "Reset hunter data"}
-            </button>
+            <div className="mt-5 space-y-2">
+              <button
+                type="button"
+                disabled={busy || removing}
+                onClick={() => void handleReset()}
+                className="min-h-11 w-full rounded-2xl bg-lilac-50 text-sm font-bold uppercase tracking-wide text-lilac-600 ring-1 ring-lilac-200 transition hover:bg-lilac-100 disabled:opacity-40"
+              >
+                {busy ? "Resetting…" : "Reset hunter data"}
+              </button>
+              <button
+                type="button"
+                disabled={busy || removing}
+                onClick={() => void handleRemove()}
+                className="min-h-11 w-full rounded-2xl bg-system-danger/10 text-sm font-bold uppercase tracking-wide text-system-danger ring-1 ring-system-danger/30 transition hover:bg-system-danger/15 disabled:opacity-40"
+              >
+                {removing ? "Removing…" : "Remove hunter"}
+              </button>
+            </div>
           </div>
 
           <h3 className="mt-8 text-xs font-bold uppercase tracking-[0.18em] text-lilac-400">

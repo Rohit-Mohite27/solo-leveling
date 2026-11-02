@@ -137,6 +137,14 @@ export async function resetHunter(hunter_id: number) {
   return getHunterDetail(hunter_id);
 }
 
+export async function deleteHunter(hunter_id: number) {
+  const hunter = await adminRepository.findHunter(hunter_id);
+  if (!hunter) throw new AdminError("NOT_FOUND", "Hunter not found", 404);
+  const ok = await adminRepository.deleteHunter(hunter_id);
+  if (!ok) throw new AdminError("NOT_FOUND", "Hunter not found", 404);
+  return { id: hunter_id, name: hunter.name, deleted: true as const };
+}
+
 export async function adminHealth() {
   return getHealthStatus();
 }

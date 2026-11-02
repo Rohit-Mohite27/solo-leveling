@@ -92,6 +92,31 @@ export async function resetHunterProgress(hunter_id: number) {
   await db.update(hunters).set({ level: 1, xp: 0, streak: 0 }).where(eq(hunters.id, hunter_id));
 }
 
+/** Wipe related rows then delete the hunter account. */
+export async function deleteHunter(hunter_id: number) {
+  const hunter = await findHunter(hunter_id);
+  if (!hunter) return false;
+
+  const logs = await db.select().from(daily_logs).where(eq(daily_logs.hunter_id, hunter_id));
+  for (const log of logs) {
+    await db.delete(daily_log_items).where(eq(daily_log_items.daily_log_id, log.id));
+  }
+  await db.delete(daily_logs).where(eq(daily_logs.hunter_id, hunter_id));
+  await db.delete(ally_unlocks).where(eq(ally_unlocks.hunter_id, hunter_id));
+  await db.delete(quests).where(eq(quests.hunter_id, hunter_id));
+
+  // OTP rows are keyed by identifier, not hunter_id
+  const identifiers = [hunter.email, hunter.phone].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
+  for (const identifier of identifiers) {
+    await db.delete(otp_challenges).where(eq(otp_challenges.identifier, identifier));
+  }
+
+  await db.delete(hunters).where(eq(hunters.id, hunter_id));
+  return true;
+}
+
 export async function insertStarterQuests(hunter_id: number) {
   const starters = [
     { name: "Push-ups", kind: "count" as const, target: "50", unit: "reps", accent: "#7c6cf0", sort_order: 0 },

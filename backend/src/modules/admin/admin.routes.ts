@@ -2,6 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../../lib/async-handler.js";
 import { attachAdmin, requireAdmin } from "../../middleware/admin.js";
 import {
+  deleteHunter,
   getHunter,
   health,
   listHunters,
@@ -24,4 +25,5 @@ adminRouter.get("/overview", requireAdmin, asyncHandler(overview));
 adminRouter.get("/hunters", requireAdmin, asyncHandler(listHunters));
 adminRouter.get("/hunters/:id", requireAdmin, asyncHandler(getHunter));
 adminRouter.post("/hunters/:id/reset", requireAdmin, asyncHandler(resetHunter));
+adminRouter.delete("/hunters/:id", requireAdmin, asyncHandler(deleteHunter));
 adminRouter.get("/health", requireAdmin, asyncHandler(health));

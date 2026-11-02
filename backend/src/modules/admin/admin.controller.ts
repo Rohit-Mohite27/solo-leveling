@@ -87,6 +87,21 @@ export async function resetHunter(req: Request, res: Response) {
   }
 }
 
+export async function deleteHunter(req: Request, res: Response) {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ success: false, code: "INVALID_ID", message: "Invalid hunter id" });
+      return;
+    }
+    const data = await adminService.deleteHunter(id);
+    res.json({ success: true, data });
+  } catch (err) {
+    if (handleAdminError(err, res)) return;
+    throw err;
+  }
+}
+
 export async function health(_req: Request, res: Response) {
   const data = await adminService.adminHealth();
   res.json({ success: true, data });

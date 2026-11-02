@@ -157,6 +157,13 @@ export async function resetAdminHunter(id: number) {
   });
 }
 
+export async function deleteAdminHunter(id: number) {
+  return adminFetch<{ id: number; name: string; deleted: true }>(
+    `/api/v1/admin/hunters/${id}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function fetchAdminHealth() {
   return adminFetch<AdminHealth>("/api/v1/admin/health");
 }
