@@ -7,12 +7,16 @@ const env_schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
-  /** static | resend (email) | msg91 (SMS widget, legacy) */
-  OTP_MODE: z.enum(["static", "resend", "msg91"]).default("static"),
+  /** static | textbee (SMS via your phone) | resend | msg91 */
+  OTP_MODE: z.enum(["static", "textbee", "resend", "msg91"]).default("static"),
   STATIC_OTP: z.string().regex(/^\d{4,8}$/).default("123456"),
-  /** Resend email OTP */
+  /** TextBee — SMS gateway through your Android device */
+  TEXTBEE_API_KEY: z.string().optional().default(""),
+  TEXTBEE_DEVICE_ID: z.string().optional().default(""),
+  TEXTBEE_BASE_URL: z.string().default("https://api.textbee.dev/api/v1"),
+  /** Country dial code digits for SMS, e.g. 91 */
+  SMS_COUNTRY_CODE: z.string().default("91"),
   RESEND_API_KEY: z.string().optional().default(""),
-  /** e.g. Solo Leveling <onboarding@resend.dev> until you verify a domain */
   OTP_FROM_EMAIL: z.string().optional().default("Solo Leveling <onboarding@resend.dev>"),
   MSG91_AUTH_KEY: z.string().optional().default(""),
   MSG91_WIDGET_ID: z.string().optional().default(""),
@@ -28,6 +32,11 @@ if (!parsed.success) {
 }
 
 const data = parsed.data;
+
+if (data.OTP_MODE === "textbee" && (!data.TEXTBEE_API_KEY || !data.TEXTBEE_DEVICE_ID)) {
+  console.error("OTP_MODE=textbee requires TEXTBEE_API_KEY and TEXTBEE_DEVICE_ID");
+  throw new Error("Backend environment validation failed");
+}
 
 if (data.OTP_MODE === "resend" && !data.RESEND_API_KEY) {
   console.error("OTP_MODE=resend requires RESEND_API_KEY");

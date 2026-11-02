@@ -1,9 +1,9 @@
 import {
   generateOtpCode,
   hashOtp,
-  normalizeEmail,
+  normalizePhone,
   otpMatches,
-  sendOtpEmail,
+  sendOtpSms,
 } from "../../lib/otp.js";
 import * as huntersRepository from "../hunters/hunters.repository.js";
 import * as questsRepository from "../quests/quests.repository.js";
@@ -30,36 +30,36 @@ export class AuthError extends Error {
   }
 }
 
-export async function requestOtp(raw_email: string) {
-  const email = normalizeEmail(raw_email);
-  if (!email) {
-    throw new AuthError("INVALID_EMAIL", "Enter a valid email address");
+export async function requestOtp(raw_phone: string) {
+  const phone = normalizePhone(raw_phone);
+  if (!phone) {
+    throw new AuthError("INVALID_PHONE", "Enter a valid 10-digit Indian mobile number");
   }
 
   const code = generateOtpCode();
-  const code_hash = hashOtp(email, code);
+  const code_hash = hashOtp(phone, code);
   const expires_at = new Date(Date.now() + OTP_TTL_MS);
 
   await authRepository.upsertOtpChallenge({
-    identifier: email,
+    identifier: phone,
     code_hash,
     expires_at,
   });
 
   try {
-    await sendOtpEmail(email, code);
+    await sendOtpSms(phone, code);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Email send failed";
+    const message = err instanceof Error ? err.message : "SMS send failed";
     throw new AuthError("OTP_SEND_FAILED", message, 502);
   }
 
-  return { email, expires_in_sec: Math.floor(OTP_TTL_MS / 1000) };
+  return { phone, expires_in_sec: Math.floor(OTP_TTL_MS / 1000) };
 }
 
-export async function verifyOtp(input: { email: string; otp: string; name: string }) {
-  const email = normalizeEmail(input.email);
-  if (!email) {
-    throw new AuthError("INVALID_EMAIL", "Enter a valid email address");
+export async function verifyOtp(input: { phone: string; otp: string; name: string }) {
+  const phone = normalizePhone(input.phone);
+  if (!phone) {
+    throw new AuthError("INVALID_PHONE", "Enter a valid 10-digit Indian mobile number");
   }
 
   const name = input.name.trim();
@@ -69,36 +69,36 @@ export async function verifyOtp(input: { email: string; otp: string; name: strin
 
   const otp = input.otp.trim();
   if (!/^\d{4,8}$/.test(otp)) {
-    throw new AuthError("INVALID_OTP", "Enter the OTP from your email");
+    throw new AuthError("INVALID_OTP", "Enter the OTP from your SMS");
   }
 
-  const challenge = await authRepository.findOtpChallenge(email);
+  const challenge = await authRepository.findOtpChallenge(phone);
   if (!challenge) {
     throw new AuthError("OTP_NOT_FOUND", "Request a new OTP first", 404);
   }
 
   if (challenge.expires_at.getTime() < Date.now()) {
-    await authRepository.deleteOtpChallenge(email);
+    await authRepository.deleteOtpChallenge(phone);
     throw new AuthError("OTP_EXPIRED", "OTP expired — request a new one", 410);
   }
 
   if (challenge.attempts >= MAX_ATTEMPTS) {
-    await authRepository.deleteOtpChallenge(email);
+    await authRepository.deleteOtpChallenge(phone);
     throw new AuthError("OTP_LOCKED", "Too many attempts — request a new OTP", 429);
   }
 
-  if (!otpMatches(email, otp, challenge.code_hash)) {
-    await authRepository.bumpOtpAttempts(email, challenge.attempts + 1);
+  if (!otpMatches(phone, otp, challenge.code_hash)) {
+    await authRepository.bumpOtpAttempts(phone, challenge.attempts + 1);
     throw new AuthError("OTP_INVALID", "Incorrect OTP", 401);
   }
 
-  await authRepository.deleteOtpChallenge(email);
+  await authRepository.deleteOtpChallenge(phone);
 
-  let hunter = await huntersRepository.findHunterByEmail(email);
+  let hunter = await huntersRepository.findHunterByPhone(phone);
   let created = false;
 
   if (!hunter) {
-    hunter = await huntersRepository.insertHunter({ name, email });
+    hunter = await huntersRepository.insertHunter({ name, phone });
     if (!hunter) throw new AuthError("CREATE_FAILED", "Could not create hunter", 500);
     created = true;
     for (const q of STARTER_QUESTS) {

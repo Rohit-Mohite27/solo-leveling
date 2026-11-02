@@ -4,12 +4,12 @@ import { clearSessionCookie, setSessionCookie } from "../../lib/session.js";
 import * as authService from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
 
-const email_body = z.object({
-  email: z.string().min(3).max(255),
+const phone_body = z.object({
+  phone: z.string().min(8).max(20),
 });
 
 const verify_body = z.object({
-  email: z.string().min(3).max(255),
+  phone: z.string().min(8).max(20),
   otp: z.string().min(4).max(8),
   name: z.string().min(1).max(120),
 });
@@ -37,8 +37,8 @@ function handleAuthError(err: unknown, res: Response): boolean {
 
 export async function requestOtp(req: Request, res: Response) {
   try {
-    const body = email_body.parse(req.body ?? {});
-    const data = await authService.requestOtp(body.email);
+    const body = phone_body.parse(req.body ?? {});
+    const data = await authService.requestOtp(body.phone);
     res.json({ success: true, data });
   } catch (err) {
     if (handleAuthError(err, res)) return;

@@ -13,7 +13,7 @@ export default function GatePage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("profile");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,19 +28,19 @@ export default function GatePage() {
     e.preventDefault();
     setError(null);
     const trimmed = name.trim();
-    const normalized = email.trim().toLowerCase();
+    const digits = phone.replace(/\D/g, "").slice(-10);
     if (!trimmed) {
       setError("Enter your hunter name");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-      setError("Enter a valid email address");
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      setError("Enter a valid 10-digit mobile number");
       return;
     }
     setBusy(true);
     try {
-      await requestOtp(normalized);
-      setEmail(normalized);
+      await requestOtp(digits);
+      setPhone(digits);
       setStep("otp");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not send OTP");
@@ -53,13 +53,13 @@ export default function GatePage() {
     e.preventDefault();
     setError(null);
     if (!/^\d{4,8}$/.test(otp.trim())) {
-      setError("Enter the OTP from your email");
+      setError("Enter the OTP from your SMS");
       return;
     }
     setBusy(true);
     try {
       const data = await verifyOtp({
-        email,
+        phone,
         otp: otp.trim(),
         name: name.trim(),
       });
@@ -118,19 +118,24 @@ export default function GatePage() {
               autoComplete="nickname"
               disabled={!ready || busy}
             />
-            <label className="sr-only" htmlFor="hunter-email">
-              Email
+            <label className="sr-only" htmlFor="hunter-phone">
+              Mobile number
             </label>
-            <input
-              id="hunter-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com"
-              className="soft-card w-full rounded-2xl border-0 px-4 py-3 text-center font-body text-base font-semibold text-ink-900 outline-none ring-1 ring-lilac-200 placeholder:text-ink-700/35 focus:ring-lilac-400"
-              autoComplete="email"
-              disabled={!ready || busy}
-            />
+            <div className="soft-card flex w-full items-center gap-2 rounded-2xl px-3 py-2 ring-1 ring-lilac-200 focus-within:ring-lilac-400">
+              <span className="shrink-0 pl-1 font-body text-base font-bold text-ink-700/70">
+                +91
+              </span>
+              <input
+                id="hunter-phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                placeholder="10-digit mobile"
+                inputMode="numeric"
+                className="w-full border-0 bg-transparent py-2 text-center font-body text-base font-semibold tracking-wider text-ink-900 outline-none placeholder:text-ink-700/35"
+                autoComplete="tel-national"
+                disabled={!ready || busy}
+              />
+            </div>
             <button
               type="submit"
               disabled={!ready || busy}
@@ -146,7 +151,7 @@ export default function GatePage() {
             style={{ animationDelay: "0.4s" }}
           >
             <p className="font-body text-sm font-semibold text-ink-700/70">
-              OTP sent to {email}
+              OTP sent to +91 {phone}
             </p>
             <label className="sr-only" htmlFor="hunter-otp">
               OTP
@@ -178,7 +183,7 @@ export default function GatePage() {
               }}
               className="font-body text-xs font-bold uppercase tracking-[0.16em] text-ink-700/50"
             >
-              Change email
+              Change number
             </button>
           </form>
         )}

@@ -119,14 +119,14 @@ export function getApiBaseUrl() {
   return API_URL;
 }
 
-export async function requestOtp(email: string) {
-  return apiFetch<{ email: string; expires_in_sec: number }>("/api/v1/auth/otp/request", {
+export async function requestOtp(phone: string) {
+  return apiFetch<{ phone: string; expires_in_sec: number }>("/api/v1/auth/otp/request", {
     method: "POST",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ phone }),
   });
 }
 
-export async function verifyOtp(input: { email: string; otp: string; name: string }) {
+export async function verifyOtp(input: { phone: string; otp: string; name: string }) {
   const data = await apiFetch<{
     hunter: ApiHunter;
     created: boolean;
