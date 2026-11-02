@@ -18,6 +18,32 @@ export async function renameGymSessionToNoFap(hunter_id: number) {
     .where(and(eq(quests.hunter_id, hunter_id), eq(quests.name, "Gym Session"), eq(quests.is_active, true)));
 }
 
+/** Ensure the fixed Steps bar exists (reactivate soft-deleted or insert). */
+export async function ensureStepsQuest(hunter_id: number) {
+  const rows = await db
+    .select()
+    .from(quests)
+    .where(and(eq(quests.hunter_id, hunter_id), eq(quests.kind, "steps")))
+    .limit(1);
+  const existing = rows[0];
+  if (existing) {
+    if (!existing.is_active) {
+      await db.update(quests).set({ is_active: true }).where(eq(quests.id, existing.id));
+    }
+    return;
+  }
+  await db.insert(quests).values({
+    hunter_id,
+    name: "Steps",
+    kind: "steps",
+    target: "10000",
+    unit: "steps",
+    accent: "#5ec4a8",
+    sort_order: 4,
+    is_active: true,
+  });
+}
+
 export async function insertQuest(values: {
   hunter_id: number;
   name: string;

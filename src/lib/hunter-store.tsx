@@ -18,6 +18,7 @@ import {
   allyForLevel,
   ascensionXpBonus,
   coreQuests,
+  isStepsQuest,
   nextAlly,
   todayKey,
   unlockedAllies,
@@ -647,6 +648,10 @@ export function HunterProvider({ children }: { children: ReactNode }) {
 
   const removeQuest = useCallback(
     (questId: string) => {
+      // Steps bar is fixed — never remove from the pack
+      const target = state.quests.find((q) => q.id === questId);
+      if (target && isStepsQuest(target)) return;
+
       if (!DEMO_TESTING) {
         const qid = Number(questId);
         if (Number.isFinite(qid)) {
@@ -654,6 +659,8 @@ export function HunterProvider({ children }: { children: ReactNode }) {
         }
       }
       setState((s) => {
+        const doomed = s.quests.find((q) => q.id === questId);
+        if (doomed && isStepsQuest(doomed)) return s;
         const nextQuests = s.quests.filter((q) => q.id !== questId);
         const restLogs = { ...s.today.logs };
         delete restLogs[questId];
@@ -664,7 +671,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
         };
       });
     },
-    [],
+    [state.quests],
   );
 
   const xpToNext = xpForLevel(state.level);

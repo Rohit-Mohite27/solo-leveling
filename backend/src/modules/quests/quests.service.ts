@@ -10,6 +10,7 @@ type CreateQuestInput = {
 
 export async function listQuestsForHunter(hunter_id: number) {
   await questsRepository.renameGymSessionToNoFap(hunter_id);
+  await questsRepository.ensureStepsQuest(hunter_id);
   return questsRepository.findQuestsByHunterId(hunter_id);
 }
 

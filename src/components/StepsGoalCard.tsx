@@ -50,7 +50,11 @@ export function StepsGoalCard({
   }
 
   function saveGoal() {
-    const next = Math.max(1000, Math.floor(Number(goalDraft) || 0));
+    const raw = goalDraft.trim();
+    const parsed = Math.floor(Number(raw));
+    // Allow any positive whole goal (200, 500, 10000, …) — do not force a 1000 floor
+    if (!Number.isFinite(parsed) || parsed < 1) return;
+    const next = Math.min(parsed, 500_000);
     onUpdateTarget(next);
     setGoalDraft(String(next));
     setEditingGoal(false);
@@ -167,7 +171,7 @@ export function StepsGoalCard({
               Edit daily target
             </h3>
             <p className="mt-1 text-sm font-semibold text-ink-700/50">
-              Change 10,000 to 15,000, 20,000, or any goal you want.
+              Set any daily goal — 200, 500, 10,000, whatever fits you.
             </p>
 
             <label className="mt-5 block">
@@ -175,13 +179,15 @@ export function StepsGoalCard({
                 Target steps
               </span>
               <input
-                type="number"
-                min={1000}
-                step={500}
+                type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 autoFocus
                 value={goalDraft}
-                onChange={(e) => setGoalDraft(e.target.value)}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  setGoalDraft(digits);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") saveGoal();
                 }}
@@ -190,7 +196,7 @@ export function StepsGoalCard({
             </label>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {[10000, 15000, 20000].map((preset) => (
+              {[200, 500, 10000, 15000, 20000].map((preset) => (
                 <button
                   key={preset}
                   type="button"
