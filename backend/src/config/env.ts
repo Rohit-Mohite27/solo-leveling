@@ -22,6 +22,8 @@ const env_schema = z.object({
   MSG91_WIDGET_ID: z.string().optional().default(""),
   MSG91_TEMPLATE_ID: z.string().optional().default(""),
   MSG91_COUNTRY_CODE: z.string().default("91"),
+  /** Shared password for /admin dashboard (leave empty to disable admin login) */
+  ADMIN_PASSWORD: z.string().optional().default(""),
 });
 
 const parsed = env_schema.safeParse(process.env);
@@ -50,6 +52,10 @@ if (data.OTP_MODE === "msg91" && (!data.MSG91_AUTH_KEY || !data.MSG91_WIDGET_ID)
 
 if (data.NODE_ENV === "production" && data.OTP_MODE === "static") {
   console.warn("[warn] OTP_MODE=static in production");
+}
+
+if (data.NODE_ENV === "production" && !data.ADMIN_PASSWORD) {
+  console.warn("[warn] ADMIN_PASSWORD is empty — /api/v1/admin login is disabled");
 }
 
 export const env = data;

@@ -7,6 +7,7 @@ import { healthRouter } from "./modules/health/health.routes.js";
 import { huntersRouter } from "./modules/hunters/hunters.routes.js";
 import { questsRouter } from "./modules/quests/quests.routes.js";
 import { dailyLogsRouter } from "./modules/daily-logs/daily-logs.routes.js";
+import { adminRouter } from "./modules/admin/admin.routes.js";
 
 export function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api/v1/hunters", huntersRouter);
   app.use("/api/v1/quests", questsRouter);
   app.use("/api/v1/daily-logs", dailyLogsRouter);
+  app.use("/api/v1/admin", adminRouter);
 
   app.use(
     (

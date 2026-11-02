@@ -12,7 +12,12 @@ const NAV = [
 
 export function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const showNav = pathname !== "/";
+  const isAdmin = pathname.startsWith("/admin");
+  const showNav = pathname !== "/" && !isAdmin;
+
+  if (isAdmin) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="atmosphere relative min-h-[100dvh]">
