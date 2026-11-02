@@ -7,10 +7,19 @@ if (!url) {
 }
 const needle = process.argv[2] || "Rohit";
 
-const conn = await mysql.createConnection(url);
+// TiDB Cloud requires TLS; plain mysql:// URLs need ssl enabled explicitly.
+const parsed = new URL(url);
+const conn = await mysql.createConnection({
+  host: parsed.hostname,
+  port: Number(parsed.port || 4000),
+  user: decodeURIComponent(parsed.username),
+  password: decodeURIComponent(parsed.password),
+  database: parsed.pathname.replace(/^\//, "") || undefined,
+  ssl: { minVersion: "TLSv1.2", rejectUnauthorized: true },
+});
 const [hunters] = await conn.query(
-  "SELECT id, name, level, xp, streak FROM hunters WHERE name = ? OR name LIKE ? OR name LIKE ?",
-  [needle, `${needle} %`, `% ${needle}`],
+  "SELECT id, name, level, xp, streak FROM hunters WHERE name = ? OR name LIKE ? OR name LIKE ? OR LOWER(name) LIKE ?",
+  [needle, `${needle} %`, `% ${needle}`, `%${needle.toLowerCase()}%`],
 );
 
 console.log("matches:", hunters);
