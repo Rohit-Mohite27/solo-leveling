@@ -4,12 +4,12 @@ import { clearSessionCookie, setSessionCookie } from "../../lib/session.js";
 import * as authService from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
 
-const phone_body = z.object({
-  phone: z.string().min(8).max(20),
+const email_body = z.object({
+  email: z.string().min(3).max(255),
 });
 
 const verify_body = z.object({
-  phone: z.string().min(8).max(20),
+  email: z.string().min(3).max(255),
   otp: z.string().min(4).max(8),
   name: z.string().min(1).max(120),
 });
@@ -37,8 +37,8 @@ function handleAuthError(err: unknown, res: Response): boolean {
 
 export async function requestOtp(req: Request, res: Response) {
   try {
-    const body = phone_body.parse(req.body ?? {});
-    const data = await authService.requestOtp(body.phone);
+    const body = email_body.parse(req.body ?? {});
+    const data = await authService.requestOtp(body.email);
     res.json({ success: true, data });
   } catch (err) {
     if (handleAuthError(err, res)) return;
@@ -64,7 +64,6 @@ export async function verifyOtp(req: Request, res: Response) {
       data: {
         hunter: data.hunter,
         created: data.created,
-        // Returned because cross-site Vercel→Render often blocks third-party cookies
         sessionToken: session_token,
       },
     });

@@ -5,20 +5,18 @@ const env_schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  /** Comma-separated allowed origins for credentialed CORS */
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
-  /** HMAC secret for session JWT cookie */
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
-  /** static = fixed OTP for local/dev; msg91 = real SMS via OTP Widget */
-  OTP_MODE: z.enum(["static", "msg91"]).default("static"),
-  /** Used when OTP_MODE=static */
+  /** static | resend (email) | msg91 (SMS widget, legacy) */
+  OTP_MODE: z.enum(["static", "resend", "msg91"]).default("static"),
   STATIC_OTP: z.string().regex(/^\d{4,8}$/).default("123456"),
+  /** Resend email OTP */
+  RESEND_API_KEY: z.string().optional().default(""),
+  /** e.g. Solo Leveling <onboarding@resend.dev> until you verify a domain */
+  OTP_FROM_EMAIL: z.string().optional().default("Solo Leveling <onboarding@resend.dev>"),
   MSG91_AUTH_KEY: z.string().optional().default(""),
-  /** OTP Widget ID from MSG91 dashboard (not SMS template id) */
   MSG91_WIDGET_ID: z.string().optional().default(""),
-  /** Legacy / unused when using widget */
   MSG91_TEMPLATE_ID: z.string().optional().default(""),
-  /** Country dial code digits, e.g. 91 for India */
   MSG91_COUNTRY_CODE: z.string().default("91"),
 });
 
@@ -31,15 +29,18 @@ if (!parsed.success) {
 
 const data = parsed.data;
 
+if (data.OTP_MODE === "resend" && !data.RESEND_API_KEY) {
+  console.error("OTP_MODE=resend requires RESEND_API_KEY");
+  throw new Error("Backend environment validation failed");
+}
+
 if (data.OTP_MODE === "msg91" && (!data.MSG91_AUTH_KEY || !data.MSG91_WIDGET_ID)) {
   console.error("OTP_MODE=msg91 requires MSG91_AUTH_KEY and MSG91_WIDGET_ID");
   throw new Error("Backend environment validation failed");
 }
 
 if (data.NODE_ENV === "production" && data.OTP_MODE === "static") {
-  console.warn(
-    "[warn] OTP_MODE=static in production — use MSG91 before sharing with friends",
-  );
+  console.warn("[warn] OTP_MODE=static in production");
 }
 
 export const env = data;
@@ -48,7 +49,6 @@ export function corsOrigins(): string[] {
   return env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-/** Exact CORS_ORIGIN entries, plus Vercel preview/prod aliases for this app. */
 export function isAllowedCorsOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
   const allowed = corsOrigins();

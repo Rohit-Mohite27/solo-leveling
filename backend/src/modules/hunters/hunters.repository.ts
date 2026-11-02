@@ -2,24 +2,20 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db/client.js";
 import { hunters } from "../../db/schema.js";
 
-export async function findAllHunters() {
-  return db.select().from(hunters);
-}
-
 export async function findHunterById(id: number) {
   const rows = await db.select().from(hunters).where(eq(hunters.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
-export async function findHunterByPhone(phone: string) {
-  const rows = await db.select().from(hunters).where(eq(hunters.phone, phone)).limit(1);
+export async function findHunterByEmail(email: string) {
+  const rows = await db.select().from(hunters).where(eq(hunters.email, email)).limit(1);
   return rows[0] ?? null;
 }
 
-export async function insertHunter(input: { name: string; phone: string }) {
+export async function insertHunter(input: { name: string; email: string }) {
   const result = await db
     .insert(hunters)
-    .values({ name: input.name, phone: input.phone })
+    .values({ name: input.name, email: input.email, phone: null })
     .$returningId();
   const id = result[0]?.id;
   if (!id) throw new Error("Failed to create hunter");

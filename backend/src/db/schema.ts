@@ -16,30 +16,36 @@ export const hunters = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     name: varchar("name", { length: 120 }).notNull(),
-    /** 10-digit Indian mobile (normalized, no country code) */
-    phone: varchar("phone", { length: 15 }).notNull(),
+    /** Login email (normalized lowercase) */
+    email: varchar("email", { length: 255 }),
+    /** Optional legacy mobile */
+    phone: varchar("phone", { length: 15 }),
     level: int("level").notNull().default(1),
     xp: int("xp").notNull().default(0),
     streak: int("streak").notNull().default(0),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
-  (t) => [uniqueIndex("hunters_phone_uq").on(t.phone)],
+  (t) => [
+    uniqueIndex("hunters_email_uq").on(t.email),
+    uniqueIndex("hunters_phone_uq").on(t.phone),
+  ],
 );
 
-/** SMS OTP challenge (hashed code, short TTL) */
+/** OTP challenge keyed by email (or legacy phone) */
 export const otp_challenges = mysqlTable(
   "otp_challenges",
   {
     id: int("id").autoincrement().primaryKey(),
-    phone: varchar("phone", { length: 15 }).notNull(),
+    /** Email or phone used to request OTP */
+    identifier: varchar("identifier", { length: 255 }).notNull(),
     code_hash: varchar("code_hash", { length: 128 }).notNull(),
     expires_at: timestamp("expires_at").notNull(),
     attempts: int("attempts").notNull().default(0),
     created_at: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("otp_challenges_phone_uq").on(t.phone),
+    uniqueIndex("otp_challenges_identifier_uq").on(t.identifier),
     index("otp_challenges_expires_idx").on(t.expires_at),
   ],
 );
@@ -72,7 +78,6 @@ export const daily_logs = mysqlTable(
     hunter_id: int("hunter_id")
       .notNull()
       .references(() => hunters.id, { onDelete: "cascade" }),
-    /** IST calendar day as YYYY-MM-DD */
     date_key: varchar("date_key", { length: 10 }).notNull(),
     status: mysqlEnum("status", ["complete", "partial", "failed", "empty"])
       .notNull()

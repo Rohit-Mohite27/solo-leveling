@@ -9,7 +9,8 @@ const TOKEN_KEY = "solo_session_token";
 export type ApiHunter = {
   id: number;
   name: string;
-  phone: string;
+  email?: string | null;
+  phone?: string | null;
   level: number;
   xp: number;
   streak: number;
@@ -118,14 +119,14 @@ export function getApiBaseUrl() {
   return API_URL;
 }
 
-export async function requestOtp(phone: string) {
-  return apiFetch<{ phone: string; expires_in_sec: number }>("/api/v1/auth/otp/request", {
+export async function requestOtp(email: string) {
+  return apiFetch<{ email: string; expires_in_sec: number }>("/api/v1/auth/otp/request", {
     method: "POST",
-    body: JSON.stringify({ phone }),
+    body: JSON.stringify({ email }),
   });
 }
 
-export async function verifyOtp(input: { phone: string; otp: string; name: string }) {
+export async function verifyOtp(input: { email: string; otp: string; name: string }) {
   const data = await apiFetch<{
     hunter: ApiHunter;
     created: boolean;

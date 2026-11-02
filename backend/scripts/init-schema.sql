@@ -1,5 +1,4 @@
--- Run once in TiDB Cloud → SQL Editor (as a user that can CREATE).
--- Then set DATABASE_URL to ...:4000/solo_leveling?...
+-- Fresh install (TiDB / MySQL)
 
 CREATE DATABASE IF NOT EXISTS solo_leveling;
 USE solo_leveling;
@@ -7,23 +6,25 @@ USE solo_leveling;
 CREATE TABLE IF NOT EXISTS hunters (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
-  phone VARCHAR(15) NOT NULL,
+  email VARCHAR(255) NULL,
+  phone VARCHAR(15) NULL,
   level INT NOT NULL DEFAULT 1,
   xp INT NOT NULL DEFAULT 0,
   streak INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY hunters_email_uq (email),
   UNIQUE KEY hunters_phone_uq (phone)
 );
 
 CREATE TABLE IF NOT EXISTS otp_challenges (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  phone VARCHAR(15) NOT NULL,
+  identifier VARCHAR(255) NOT NULL,
   code_hash VARCHAR(128) NOT NULL,
   expires_at TIMESTAMP NOT NULL,
   attempts INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY otp_challenges_phone_uq (phone),
+  UNIQUE KEY otp_challenges_identifier_uq (identifier),
   KEY otp_challenges_expires_idx (expires_at)
 );
 
