@@ -7,6 +7,7 @@ import { AdminApiError, adminLogin, adminMe, getAdminToken } from "@/lib/admin-a
 export default function AdminLoginPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
@@ -72,14 +73,25 @@ export default function AdminLoginPage() {
           <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-700/40">
             Password
           </span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-lilac-200 bg-white px-3 py-2.5 font-semibold text-ink-900 outline-none focus:border-lilac-400"
-            required
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-lilac-200 bg-white px-3 py-2.5 pr-12 font-semibold text-ink-900 outline-none focus:border-lilac-400"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-lilac-500 transition hover:text-lilac-700"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
         </label>
         {error && (
           <p className="text-sm font-semibold text-system-danger" role="alert">
@@ -95,5 +107,33 @@ export default function AdminLoginPage() {
         </button>
       </form>
     </section>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M3 3l18 18M10.5 10.7a3 3 0 004.2 4.2M9.9 5.6A10.5 10.5 0 0112 5c6.5 0 10 7 10 7a18.4 18.4 0 01-3.2 3.8M6.1 6.3A18.5 18.5 0 002 12s3.5 7 10 7c1.4 0 2.7-.3 3.9-.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
