@@ -90,6 +90,10 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(12px) scale(0.94)" },
           "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
         },
+        "rules-pop": {
+          "0%, 100%": { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(246, 216, 96, 0.55)" },
+          "50%": { transform: "scale(1.06)", boxShadow: "0 0 0 10px rgba(246, 216, 96, 0)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.55s ease-out forwards",
@@ -101,6 +105,7 @@ const config: Config = {
         "type-fade": "type-fade 0.5s ease-out forwards",
         "glow-pulse": "glow-pulse 2.8s ease-in-out infinite",
         "btn-pop": "btn-pop 0.45s ease-out forwards",
+        "rules-pop": "rules-pop 1.8s ease-in-out infinite",
       },
     },
   },

@@ -205,3 +205,52 @@ export async function createQuestApi(
 export async function deleteQuestApi(questId: number) {
   return apiFetch<{ id: number }>(`/api/v1/quests/${questId}`, { method: "DELETE" });
 }
+
+export type LeaderboardEntry = {
+  rank: number;
+  id: number;
+  name: string;
+  level: number;
+  xp: number;
+  streak: number;
+};
+
+export type HunterRecord = {
+  hunter: {
+    id: number;
+    name: string;
+    level: number;
+    xp: number;
+    streak: number;
+    rank: number | null;
+  };
+  quests: Array<{
+    id: number;
+    name: string;
+    kind: string;
+    target: string;
+    unit: string;
+    accent: string;
+  }>;
+  recentDays: Array<{
+    dateKey: string;
+    status: string;
+    submitted: boolean;
+    tasks: Array<{
+      questId: number;
+      name: string;
+      kind: string | null;
+      unit: string | null;
+      value: string;
+      cleared: boolean;
+    }>;
+  }>;
+};
+
+export async function fetchLeaderboard() {
+  return apiFetch<LeaderboardEntry[]>("/api/v1/leaderboard");
+}
+
+export async function fetchHunterRecord(hunterId: number) {
+  return apiFetch<HunterRecord>(`/api/v1/leaderboard/${hunterId}`);
+}

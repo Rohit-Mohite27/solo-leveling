@@ -1,0 +1,15 @@
+---
+description: When DEMO_TESTING is enabled, skip OTP and use name-only gate
+alwaysApply: true
+---
+
+# Demo mode
+
+When the user says **demo = true**, **make demo true**, or enable testing/demo mode:
+
+1. Set `DEMO_TESTING = true` in `src/lib/demo-data.ts`.
+2. **OTP must be removed by default** — gate is name-only (`enterGate`), no phone/OTP UI or API calls.
+3. Do not leave the production OTP form visible while demo is on.
+4. When they say **demo = false**, set `DEMO_TESTING = false` and restore the OTP gate.
+
+`src/app/page.tsx` must branch on `DEMO_TESTING` for this. Do not push demo=true to production unless the user explicitly asks to push.

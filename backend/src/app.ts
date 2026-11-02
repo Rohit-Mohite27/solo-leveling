@@ -8,6 +8,7 @@ import { huntersRouter } from "./modules/hunters/hunters.routes.js";
 import { questsRouter } from "./modules/quests/quests.routes.js";
 import { dailyLogsRouter } from "./modules/daily-logs/daily-logs.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
+import { leaderboardRouter } from "./modules/leaderboard/leaderboard.routes.js";
 
 export function createApp() {
   const app = express();
@@ -44,6 +45,7 @@ export function createApp() {
   app.use("/api/v1/quests", questsRouter);
   app.use("/api/v1/daily-logs", dailyLogsRouter);
   app.use("/api/v1/admin", adminRouter);
+  app.use("/api/v1/leaderboard", leaderboardRouter);
 
   app.use(
     (

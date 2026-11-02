@@ -261,6 +261,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
           // ignore
         }
         if (!cancelled) {
+          setAuthError(null);
           setHydrated(true);
           setApiReady(true);
         }
@@ -270,6 +271,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       try {
         const me = await fetchMe();
         if (cancelled) return;
+        setAuthError(null);
         await loadSessionPack(me.hunter);
       } catch (err) {
         if (cancelled) return;
