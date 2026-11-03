@@ -129,12 +129,77 @@ export async function getHunterDetail(hunter_id: number) {
   };
 }
 
+export async function getHunterDay(hunter_id: number, date_key: string) {
+  const hunter = await adminRepository.findHunter(hunter_id);
+  if (!hunter) throw new AdminError("NOT_FOUND", "Hunter not found", 404);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date_key)) {
+    throw new AdminError("BAD_REQUEST", "Invalid date key", 400);
+  }
+
+  const log = await adminRepository.findLogByDate(hunter_id, date_key);
+  if (!log) {
+    return {
+      dateKey: date_key,
+      status: "empty" as const,
+      submitted: false,
+      tasks: [] as Array<{
+        questId: number;
+        name: string;
+        kind: string | null;
+        unit: string | null;
+        target: string | null;
+        value: string;
+        cleared: boolean;
+        active: boolean;
+      }>,
+    };
+  }
+
+  const items = await adminRepository.listItemsForLog(log.id);
+  return {
+    dateKey: log.date_key,
+    status: log.status,
+    submitted: log.submitted,
+    tasks: items.map((i) => ({
+      questId: i.quest_id,
+      name: i.quest_name ?? `Quest #${i.quest_id}`,
+      kind: i.quest_kind,
+      unit: i.quest_unit,
+      target: i.quest_target,
+      value: i.value,
+      cleared: i.cleared,
+      active: Boolean(i.quest_active),
+    })),
+  };
+}
+
 export async function resetHunter(hunter_id: number) {
   const hunter = await adminRepository.findHunter(hunter_id);
   if (!hunter) throw new AdminError("NOT_FOUND", "Hunter not found", 404);
   await adminRepository.resetHunterProgress(hunter_id);
   await adminRepository.insertStarterQuests(hunter_id);
   return getHunterDetail(hunter_id);
+}
+
+const date_key_re = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function resetHunterDates(hunter_id: number, date_keys: string[]) {
+  const hunter = await adminRepository.findHunter(hunter_id);
+  if (!hunter) throw new AdminError("NOT_FOUND", "Hunter not found", 404);
+
+  const cleaned = [...new Set(date_keys.map((k) => k.trim()).filter(Boolean))];
+  if (cleaned.length === 0) {
+    throw new AdminError("BAD_REQUEST", "Pick at least one date (YYYY-MM-DD)", 400);
+  }
+  for (const key of cleaned) {
+    if (!date_key_re.test(key)) {
+      throw new AdminError("BAD_REQUEST", `Invalid date key: ${key}`, 400);
+    }
+  }
+
+  const result = await adminRepository.deleteHunterLogsByDates(hunter_id, cleaned);
+  const detail = await getHunterDetail(hunter_id);
+  return { ...detail, clearedDates: result.dateKeys, clearedCount: result.deleted };
 }
 
 export async function deleteHunter(hunter_id: number) {

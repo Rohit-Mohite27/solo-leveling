@@ -44,6 +44,22 @@ export type AdminHunterDetail = {
   }>;
 };
 
+export type AdminHunterDay = {
+  dateKey: string;
+  status: string;
+  submitted: boolean;
+  tasks: Array<{
+    questId: number;
+    name: string;
+    kind: string | null;
+    unit: string | null;
+    target: string | null;
+    value: string;
+    cleared: boolean;
+    active: boolean;
+  }>;
+};
+
 export type AdminHealth = {
   service: string;
   database: "up" | "down";
@@ -151,10 +167,26 @@ export async function fetchAdminHunter(id: number) {
   return adminFetch<AdminHunterDetail>(`/api/v1/admin/hunters/${id}`);
 }
 
+export async function fetchAdminHunterDay(id: number, dateKey: string) {
+  return adminFetch<AdminHunterDay>(
+    `/api/v1/admin/hunters/${id}/days/${encodeURIComponent(dateKey)}`,
+  );
+}
+
 export async function resetAdminHunter(id: number) {
   return adminFetch<AdminHunterDetail>(`/api/v1/admin/hunters/${id}/reset`, {
     method: "POST",
   });
+}
+
+export async function resetAdminHunterDates(id: number, dateKeys: string[]) {
+  return adminFetch<AdminHunterDetail & { clearedDates: string[]; clearedCount: number }>(
+    `/api/v1/admin/hunters/${id}/reset-dates`,
+    {
+      method: "POST",
+      body: JSON.stringify({ dateKeys }),
+    },
+  );
 }
 
 export async function deleteAdminHunter(id: number) {

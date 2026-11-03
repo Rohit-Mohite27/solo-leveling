@@ -72,6 +72,22 @@ export async function getHunter(req: Request, res: Response) {
   }
 }
 
+export async function getHunterDay(req: Request, res: Response) {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ success: false, code: "INVALID_ID", message: "Invalid hunter id" });
+      return;
+    }
+    const date_key = typeof req.params.dateKey === "string" ? req.params.dateKey : "";
+    const data = await adminService.getHunterDay(id, date_key);
+    res.json({ success: true, data });
+  } catch (err) {
+    if (handleAdminError(err, res)) return;
+    throw err;
+  }
+}
+
 export async function resetHunter(req: Request, res: Response) {
   try {
     const id = parseId(req.params.id);
@@ -97,6 +113,34 @@ export async function deleteHunter(req: Request, res: Response) {
     const data = await adminService.deleteHunter(id);
     res.json({ success: true, data });
   } catch (err) {
+    if (handleAdminError(err, res)) return;
+    throw err;
+  }
+}
+
+const reset_dates_body = z.object({
+  dateKeys: z.array(z.string().min(1).max(16)).min(1).max(60),
+});
+
+export async function resetHunterDates(req: Request, res: Response) {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ success: false, code: "INVALID_ID", message: "Invalid hunter id" });
+      return;
+    }
+    const body = reset_dates_body.parse(req.body ?? {});
+    const data = await adminService.resetHunterDates(id, body.dateKeys);
+    res.json({ success: true, data });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        code: "BAD_REQUEST",
+        message: "Provide dateKeys: string[] (YYYY-MM-DD)",
+      });
+      return;
+    }
     if (handleAdminError(err, res)) return;
     throw err;
   }

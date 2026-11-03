@@ -4,6 +4,7 @@ import { attachAdmin, requireAdmin } from "../../middleware/admin.js";
 import {
   deleteHunter,
   getHunter,
+  getHunterDay,
   health,
   listHunters,
   login,
@@ -11,6 +12,7 @@ import {
   me,
   overview,
   resetHunter,
+  resetHunterDates,
 } from "./admin.controller.js";
 
 export const adminRouter = Router();
@@ -24,6 +26,8 @@ adminRouter.get("/me", asyncHandler(me));
 adminRouter.get("/overview", requireAdmin, asyncHandler(overview));
 adminRouter.get("/hunters", requireAdmin, asyncHandler(listHunters));
 adminRouter.get("/hunters/:id", requireAdmin, asyncHandler(getHunter));
+adminRouter.get("/hunters/:id/days/:dateKey", requireAdmin, asyncHandler(getHunterDay));
 adminRouter.post("/hunters/:id/reset", requireAdmin, asyncHandler(resetHunter));
+adminRouter.post("/hunters/:id/reset-dates", requireAdmin, asyncHandler(resetHunterDates));
 adminRouter.delete("/hunters/:id", requireAdmin, asyncHandler(deleteHunter));
 adminRouter.get("/health", requireAdmin, asyncHandler(health));

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, like, or, sql } from "drizzle-orm";
 import { db } from "../../db/client.js";
 import {
   ally_unlocks,
@@ -81,6 +81,33 @@ export async function listRecentLogs(hunter_id: number, limit = 14) {
     .limit(limit);
 }
 
+export async function findLogByDate(hunter_id: number, date_key: string) {
+  const rows = await db
+    .select()
+    .from(daily_logs)
+    .where(and(eq(daily_logs.hunter_id, hunter_id), eq(daily_logs.date_key, date_key)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listItemsForLog(daily_log_id: number) {
+  return db
+    .select({
+      id: daily_log_items.id,
+      quest_id: daily_log_items.quest_id,
+      value: daily_log_items.value,
+      cleared: daily_log_items.cleared,
+      quest_name: quests.name,
+      quest_kind: quests.kind,
+      quest_unit: quests.unit,
+      quest_target: quests.target,
+      quest_active: quests.is_active,
+    })
+    .from(daily_log_items)
+    .leftJoin(quests, eq(quests.id, daily_log_items.quest_id))
+    .where(eq(daily_log_items.daily_log_id, daily_log_id));
+}
+
 export async function resetHunterProgress(hunter_id: number) {
   const logs = await db.select().from(daily_logs).where(eq(daily_logs.hunter_id, hunter_id));
   for (const log of logs) {
@@ -90,6 +117,31 @@ export async function resetHunterProgress(hunter_id: number) {
   await db.delete(ally_unlocks).where(eq(ally_unlocks.hunter_id, hunter_id));
   await db.delete(quests).where(eq(quests.hunter_id, hunter_id));
   await db.update(hunters).set({ level: 1, xp: 0, streak: 0 }).where(eq(hunters.id, hunter_id));
+}
+
+/** Delete one or more calendar days of logs for a hunter (XP/level/streak unchanged). */
+export async function deleteHunterLogsByDates(hunter_id: number, date_keys: string[]) {
+  const keys = [...new Set(date_keys.map((k) => k.trim()).filter(Boolean))];
+  if (keys.length === 0) return { deleted: 0 as const, dateKeys: [] as string[] };
+
+  const logs = await db
+    .select()
+    .from(daily_logs)
+    .where(and(eq(daily_logs.hunter_id, hunter_id), inArray(daily_logs.date_key, keys)));
+
+  for (const log of logs) {
+    await db.delete(daily_log_items).where(eq(daily_log_items.daily_log_id, log.id));
+  }
+  if (logs.length > 0) {
+    await db
+      .delete(daily_logs)
+      .where(and(eq(daily_logs.hunter_id, hunter_id), inArray(daily_logs.date_key, keys)));
+  }
+
+  return {
+    deleted: logs.length,
+    dateKeys: logs.map((l) => l.date_key),
+  };
 }
 
 /** Wipe related rows then delete the hunter account. */
