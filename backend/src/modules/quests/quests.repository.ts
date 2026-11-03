@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../../db/client.js";
-import { quests } from "../../db/schema.js";
+import { daily_log_items, quests } from "../../db/schema.js";
 
 export async function findQuestsByHunterId(hunter_id: number) {
   return db
@@ -77,5 +77,7 @@ export async function findQuestById(id: number) {
 }
 
 export async function softDeleteQuest(id: number) {
+  // Drop log rows for this quest so removed goals don't keep showing as "completed"
+  await db.delete(daily_log_items).where(eq(daily_log_items.quest_id, id));
   await db.update(quests).set({ is_active: false }).where(eq(quests.id, id));
 }

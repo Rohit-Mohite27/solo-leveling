@@ -14,20 +14,25 @@ import {
   DEMO_TESTING,
   STARTER_QUESTS,
   migrateStarterQuests,
-  allyAscension,
   allyForLevel,
-  ascensionXpBonus,
   coreQuests,
   isStepsQuest,
   nextAlly,
   todayKey,
   unlockedAllies,
-  xpForLevel,
   type Ally,
   type DayRecord,
   type DayStatus,
   type Quest,
 } from "./demo-data";
+import {
+  ALLY_BOOST_COST,
+  CACHE_CHARGE_MAX,
+  buildReward,
+  computeRewardBreakdown,
+  makeDummyPendingRewards,
+  type PendingReward,
+} from "./rewards";
 import {
   ApiError,
   createQuestApi,
@@ -59,7 +64,9 @@ type DayState = {
 type HunterState = {
   hunterId: number | null;
   name: string;
+  /** Rises only when a full day is cleared + submitted */
   level: number;
+  /** Spendable Essence — does not raise level */
   xp: number;
   streak: number;
   quests: Quest[];
@@ -68,6 +75,16 @@ type HunterState = {
   selectedDate: string;
   pendingAlly: Ally | null;
   entered: boolean;
+  /** Unopened System reward chests */
+  pendingRewards: PendingReward[];
+  /** Extra power ranks bought with Essence */
+  allyBoosts: Record<string, number>;
+  /** 0–100 charge toward next Overload Cache */
+  cacheCharge: number;
+  /** Last claimed chest — drives Jinwoo popup */
+  rewardPopup: PendingReward | null;
+  /** Streak broke — army sealed until they clear days again */
+  armyLostPopup: boolean;
 };
 
 type HunterContextValue = HunterState & {
@@ -84,6 +101,15 @@ type HunterContextValue = HunterState & {
   markYesNo: (questId: string, done: boolean) => void;
   submitDay: () => Promise<{ leveled: boolean; newLevel: number; blocked?: boolean }>;
   dismissAlly: () => void;
+  claimReward: (rewardId: string) => void;
+  dismissRewardPopup: () => void;
+  dismissArmyLostPopup: () => void;
+  boostAlly: (allyId: string) => { ok: boolean; message: string };
+  chargeCacheFromExtras: (extraXp: number) => void;
+  /** Testing: load chests + Essence + mid-level army */
+  seedRewardDemo: () => void;
+  /** Testing: force streak break + army-loss popup */
+  simulateArmyLoss: () => void;
   addQuest: (quest: Omit<Quest, "id">) => void;
   updateQuestTarget: (questId: string, target: number) => void;
   removeQuest: (questId: string) => void;
@@ -93,8 +119,10 @@ type HunterContextValue = HunterState & {
   previewNextUnlock: () => void;
   /** Testing / midnight warning: reset streak to 0 */
   breakStreakForTest: () => void;
+  /** Essence needed for next cache tick (display) */
   xpToNext: number;
   xpProgress: number;
+  unclaimedRewards: number;
   todayClearedCount: number;
   allCleared: boolean;
   clearPercent: number;
@@ -104,7 +132,7 @@ type HunterContextValue = HunterState & {
   selectedClears: Record<string, boolean>;
 };
 
-const STORAGE_KEY = "solo-leveling-hunter-v11";
+const STORAGE_KEY = "solo-leveling-hunter-v12";
 
 function emptyDay(quests: Quest[], dateKey = todayKey()): DayState {
   const logs: Record<string, QuestLog> = {};
@@ -174,6 +202,23 @@ function defaultState(): HunterState {
     selectedDate: key,
     pendingAlly: null,
     entered: false,
+    pendingRewards: [],
+    allyBoosts: {},
+    cacheCharge: 0,
+    rewardPopup: null,
+    armyLostPopup: false,
+  };
+}
+
+/** Reset army progress after a broken streak — Essence chests stay. */
+function applyArmyLoss<T extends HunterState>(s: T): T {
+  return {
+    ...s,
+    level: 1,
+    streak: 0,
+    pendingAlly: null,
+    allyBoosts: {},
+    armyLostPopup: true,
   };
 }
 
@@ -206,11 +251,13 @@ export function HunterProvider({ children }: { children: ReactNode }) {
         questClears: {},
       }));
 
-    setState({
+    setState((prev) => ({
+      ...prev,
       hunterId: hunter.id,
       name: hunter.name,
       level: hunter.level,
-      xp: hunter.xp,
+      // Essence is local spendable currency — do not replace with backend level XP
+      xp: prev.xp ?? 0,
       streak: hunter.streak,
       quests,
       today,
@@ -218,7 +265,12 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       selectedDate: today.dateKey,
       pendingAlly: null,
       entered: true,
-    });
+      pendingRewards: prev.pendingRewards ?? [],
+      allyBoosts: prev.allyBoosts ?? {},
+      cacheCharge: prev.cacheCharge ?? 0,
+      rewardPopup: null,
+      armyLostPopup: false,
+    }));
     setApiReady(true);
     setAuthError(null);
   }, []);
@@ -255,6 +307,11 @@ export function HunterProvider({ children }: { children: ReactNode }) {
               },
               selectedDate: key,
               pendingAlly: null,
+              pendingRewards: parsed.pendingRewards ?? [],
+              allyBoosts: parsed.allyBoosts ?? {},
+              cacheCharge: parsed.cacheCharge ?? 0,
+              rewardPopup: null,
+              armyLostPopup: false,
             });
           }
         } catch {
@@ -345,11 +402,46 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       setState((s) => {
         const quest = s.quests.find((q) => q.id === questId);
         if (!quest) return s;
-        const nextValue = Math.max(0, value);
-        const cleared = isCleared(quest, nextValue);
+        const prevLog = s.today.logs[questId];
+        const prevValue = prevLog?.value ?? 0;
+        const wasCleared = Boolean(prevLog?.cleared);
+        // Once Cleared, never drop below the goal (can't mark undone)
+        let nextValue = Math.max(0, value);
+        if (wasCleared && quest.kind !== "steps") {
+          if (quest.kind === "yesno") nextValue = 1;
+          else nextValue = Math.max(quest.target, nextValue);
+        }
+        const cleared = wasCleared || isCleared(quest, nextValue);
         syncItem(questId, nextValue, cleared);
+
+        // Over-goal grind charges Overload Cache (extras → chests, not level)
+        let cacheCharge = s.cacheCharge;
+        let pendingRewards = s.pendingRewards;
+        if (quest.kind !== "yesno" && quest.kind !== "steps" && nextValue > prevValue) {
+          const overBefore = Math.max(0, prevValue - quest.target);
+          const overAfter = Math.max(0, nextValue - quest.target);
+          const newOver = overAfter - overBefore;
+          if (newOver > 0) {
+            const extraXp =
+              quest.kind === "distance"
+                ? Math.round(newOver * 15)
+                : Math.floor(newOver) * 2;
+            cacheCharge += extraXp;
+            const spawned: PendingReward[] = [];
+            while (cacheCharge >= CACHE_CHARGE_MAX) {
+              cacheCharge -= CACHE_CHARGE_MAX;
+              spawned.push(
+                buildReward("extra_grind", 40 + Math.floor(Math.random() * 25), "Overload Cache"),
+              );
+            }
+            if (spawned.length) pendingRewards = [...spawned, ...pendingRewards];
+          }
+        }
+
         return {
           ...s,
+          cacheCharge,
+          pendingRewards,
           today: {
             ...s.today,
             logs: {
@@ -369,7 +461,9 @@ export function HunterProvider({ children }: { children: ReactNode }) {
 
   const markYesNo = useCallback(
     (questId: string, done: boolean) => {
-      setLogValue(questId, done ? 1 : 0);
+      // Cleared goals stay cleared — no undo
+      if (!done) return;
+      setLogValue(questId, 1);
     },
     [setLogValue],
   );
@@ -381,10 +475,10 @@ export function HunterProvider({ children }: { children: ReactNode }) {
         if (s.today.submitted && !DEMO_TESTING) return s;
         const quest = s.quests.find((q) => q.id === questId);
         if (!quest) return s;
-        const current = s.today.logs[questId]?.cleared ?? false;
-        const nextCleared = !current;
-        const value = nextCleared ? (quest.kind === "yesno" ? 1 : quest.target) : 0;
-        syncItem(questId, value, nextCleared);
+        // Already Cleared — lock it; extras still go through setLogValue / Log tab
+        if (s.today.logs[questId]?.cleared) return s;
+        const value = quest.kind === "yesno" ? 1 : quest.target;
+        syncItem(questId, value, true);
         return {
           ...s,
           today: {
@@ -392,7 +486,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
             submitted: DEMO_TESTING ? false : s.today.submitted,
             logs: {
               ...s.today.logs,
-              [questId]: { questId, value, cleared: nextCleared },
+              [questId]: { questId, value, cleared: true },
             },
           },
         };
@@ -405,12 +499,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
     let leveled = false;
     let newLevel = 0;
 
-    // Must clear every core quest before the System accepts the day.
-    const coreNow = coreQuests(state.quests);
-    const readyToSubmit =
-      coreNow.length > 0 &&
-      coreNow.every((q) => state.today.logs[q.id]?.cleared);
-    if (!readyToSubmit) {
+    if (state.quests.length === 0) {
       return { leveled: false, newLevel: 0, blocked: true };
     }
 
@@ -425,24 +514,52 @@ export function HunterProvider({ children }: { children: ReactNode }) {
             leveled && result.hunter.level > prevLevel
               ? allyForLevel(result.hunter.level)
               : null;
-          setState((s) => ({
-            ...s,
-            level: result.hunter.level,
-            xp: result.hunter.xp,
-            streak: result.hunter.streak,
-            pendingAlly: ally ?? s.pendingAlly,
-            today: { ...s.today, submitted: true },
-            history: [
-              ...s.history.filter((h) => h.dateKey !== s.today.dateKey),
-              {
-                dateKey: s.today.dateKey,
-                status: (result.status as DayStatus) ?? "partial",
-                questClears: Object.fromEntries(
-                  s.quests.map((q) => [q.id, Boolean(s.today.logs[q.id]?.cleared)]),
-                ),
-              },
-            ],
-          }));
+          const breakdown = computeRewardBreakdown(state.quests, state.today.logs);
+          const allClear = coreQuests(state.quests).every(
+            (q) => state.today.logs[q.id]?.cleared,
+          );
+          // Day chest = goal work only; extras charge Overload Cache separately
+          let chestXp = breakdown.clearedXp;
+          if (allClear) {
+            chestXp += 40;
+            const nextStreak = (result.hunter.streak ?? state.streak) || 1;
+            if (nextStreak > 1) chestXp += Math.min(50, nextStreak * 5);
+          }
+          const reward = buildReward(
+            allClear ? "day_clear" : "partial_day",
+            chestXp,
+          );
+          const brokeStreak = !allClear && state.streak > 0;
+          setState((s) => {
+            const next = {
+              ...s,
+              level: brokeStreak ? 1 : result.hunter.level,
+              // Keep local Essence bank — backend xp is not spendable currency
+              streak: result.hunter.streak,
+              pendingAlly: brokeStreak ? null : ally ?? s.pendingAlly,
+              allyBoosts: brokeStreak ? {} : s.allyBoosts,
+              armyLostPopup: brokeStreak ? true : s.armyLostPopup,
+              // Extra grind already charged the cache on Log → Save; day chest only here
+              pendingRewards:
+                reward.xp > 0 ? [reward, ...s.pendingRewards] : s.pendingRewards,
+              today: { ...s.today, submitted: true },
+              history: [
+                ...s.history.filter((h) => h.dateKey !== s.today.dateKey),
+                {
+                  dateKey: s.today.dateKey,
+                  status: (result.status as DayStatus) ?? "partial",
+                  questClears: Object.fromEntries(
+                    s.quests.map((q) => [q.id, Boolean(s.today.logs[q.id]?.cleared)]),
+                  ),
+                },
+              ],
+            };
+            return next;
+          });
+          if (brokeStreak) {
+            leveled = false;
+            newLevel = 1;
+          }
         }
         return { leveled, newLevel };
       } catch (err) {
@@ -470,50 +587,51 @@ export function HunterProvider({ children }: { children: ReactNode }) {
             { dateKey: s.today.dateKey, status, questClears },
           ];
 
+      const prevStreak = s.streak;
       const streak = allClear ? s.streak + 1 : 0;
-
-      let xpGain = 0;
-      for (const q of core) {
-        if (s.today.logs[q.id]?.cleared) xpGain += 25;
+      const brokeStreak = !allClear && prevStreak > 0;
+      const breakdown = computeRewardBreakdown(s.quests, s.today.logs);
+      let chestXp = breakdown.clearedXp;
+      if (allClear) {
+        chestXp += 40;
+        if (streak > 1) chestXp += Math.min(50, streak * 5);
       }
-      if (allClear) xpGain += 40;
-      if (allClear && streak > 1) xpGain += Math.min(50, streak * 5);
 
+      // Level only from a fully cleared day — Essence stays in unclaimed chests
       let level = s.level;
-      let xp = s.xp + xpGain;
       let pendingAlly = s.pendingAlly;
-
-      if (DEMO_TESTING && allClear) {
+      let allyBoosts = s.allyBoosts;
+      let armyLostPopup = s.armyLostPopup;
+      if (brokeStreak) {
+        level = 1;
+        pendingAlly = null;
+        allyBoosts = {};
+        armyLostPopup = true;
+        leveled = false;
+        newLevel = 1;
+      } else if (allClear) {
         level += 1;
         leveled = true;
         newLevel = level;
-        xp = 0;
         const ally = allyForLevel(level);
-        if (ally) {
-          pendingAlly = ally;
-          xp = ascensionXpBonus(allyAscension(level, ally));
-        }
-      } else {
-        while (xp >= xpForLevel(level)) {
-          xp -= xpForLevel(level);
-          level += 1;
-          leveled = true;
-          newLevel = level;
-          const ally = allyForLevel(level);
-          if (ally) {
-            pendingAlly = ally;
-            xp += ascensionXpBonus(allyAscension(level, ally));
-          }
-        }
+        if (ally) pendingAlly = ally;
       }
 
+      const reward =
+        chestXp > 0
+          ? buildReward(allClear ? "day_clear" : "partial_day", chestXp)
+          : null;
+
+      // Extras already charged Overload Cache on Log → Save; avoid double-dip
       return {
         ...s,
         level,
-        xp,
         streak,
         history,
         pendingAlly,
+        allyBoosts,
+        armyLostPopup,
+        pendingRewards: reward ? [reward, ...s.pendingRewards] : s.pendingRewards,
         today: DEMO_TESTING
           ? emptyDay(s.quests, s.today.dateKey)
           : { ...s.today, submitted: true },
@@ -521,10 +639,97 @@ export function HunterProvider({ children }: { children: ReactNode }) {
     });
 
     return { leveled, newLevel };
-  }, [state.hunterId, state.level, state.quests, state.today.logs]);
+  }, [state.hunterId, state.level, state.quests, state.streak, state.today.logs]);
 
   const dismissAlly = useCallback(() => {
     setState((s) => ({ ...s, pendingAlly: null }));
+  }, []);
+
+  const claimReward = useCallback((rewardId: string) => {
+    setState((s) => {
+      const chest = s.pendingRewards.find((r) => r.id === rewardId && !r.claimed);
+      if (!chest) return s;
+      return {
+        ...s,
+        xp: s.xp + chest.xp,
+        pendingRewards: s.pendingRewards.map((r) =>
+          r.id === rewardId ? { ...r, claimed: true } : r,
+        ),
+        rewardPopup: { ...chest, claimed: true },
+      };
+    });
+  }, []);
+
+  const dismissRewardPopup = useCallback(() => {
+    setState((s) => ({ ...s, rewardPopup: null }));
+  }, []);
+
+  const dismissArmyLostPopup = useCallback(() => {
+    setState((s) => ({ ...s, armyLostPopup: false }));
+  }, []);
+
+  const seedRewardDemo = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      level: 6,
+      streak: 8,
+      xp: 180,
+      cacheCharge: 72,
+      allyBoosts: { igris: 1, jinho: 2 },
+      pendingRewards: makeDummyPendingRewards(),
+      rewardPopup: null,
+      armyLostPopup: false,
+      pendingAlly: null,
+    }));
+  }, []);
+
+  const simulateArmyLoss = useCallback(() => {
+    setState((s) =>
+      applyArmyLoss({
+        ...s,
+        // Give them an army first so the loss feels real in testing
+        level: Math.max(s.level, 5),
+        streak: Math.max(s.streak, 4),
+      }),
+    );
+  }, []);
+
+  const boostAlly = useCallback((allyId: string) => {
+    let result = { ok: false, message: "Not enough Essence" };
+    setState((s) => {
+      if (s.xp < ALLY_BOOST_COST) {
+        result = { ok: false, message: `Need ${ALLY_BOOST_COST} Essence to boost` };
+        return s;
+      }
+      const nextRank = (s.allyBoosts[allyId] ?? 0) + 1;
+      result = { ok: true, message: `Boost applied · rank ${nextRank}` };
+      return {
+        ...s,
+        xp: s.xp - ALLY_BOOST_COST,
+        allyBoosts: { ...s.allyBoosts, [allyId]: nextRank },
+      };
+    });
+    return result;
+  }, []);
+
+  /** Charge Overload Cache from extra reps logged on the Log tab. */
+  const chargeCacheFromExtras = useCallback((extraXp: number) => {
+    if (extraXp <= 0) return;
+    setState((s) => {
+      let charge = s.cacheCharge + extraXp;
+      const spawned: PendingReward[] = [];
+      while (charge >= CACHE_CHARGE_MAX) {
+        charge -= CACHE_CHARGE_MAX;
+        spawned.push(
+          buildReward("extra_grind", 40 + Math.floor(Math.random() * 25), "Overload Cache"),
+        );
+      }
+      return {
+        ...s,
+        cacheCharge: charge,
+        pendingRewards: spawned.length ? [...spawned, ...s.pendingRewards] : s.pendingRewards,
+      };
+    });
   }, []);
 
   const resetDemo = useCallback(() => {
@@ -565,12 +770,17 @@ export function HunterProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const breakStreakForTest = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      streak: 0,
-      today: emptyDay(s.quests, todayKey()),
-      selectedDate: todayKey(),
-    }));
+    setState((s) => {
+      const hadArmy = s.streak > 0 || s.level > 1;
+      const next = hadArmy
+        ? applyArmyLoss(s)
+        : { ...s, streak: 0, armyLostPopup: false };
+      return {
+        ...next,
+        today: emptyDay(s.quests, todayKey()),
+        selectedDate: todayKey(),
+      };
+    });
   }, []);
 
   const addQuest = useCallback(
@@ -676,8 +886,9 @@ export function HunterProvider({ children }: { children: ReactNode }) {
     [state.quests],
   );
 
-  const xpToNext = xpForLevel(state.level);
-  const xpProgress = Math.min(100, Math.round((state.xp / xpToNext) * 100));
+  const xpToNext = Math.max(0, CACHE_CHARGE_MAX - state.cacheCharge);
+  const xpProgress = Math.min(100, Math.round((state.cacheCharge / CACHE_CHARGE_MAX) * 100));
+  const unclaimedRewards = state.pendingRewards.filter((r) => !r.claimed).length;
   const core = coreQuests(state.quests);
   const todayClearedCount = core.filter((q) => state.today.logs[q.id]?.cleared).length;
   const allCleared = core.length > 0 && todayClearedCount === core.length;
@@ -714,6 +925,13 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       markYesNo,
       submitDay,
       dismissAlly,
+      claimReward,
+      dismissRewardPopup,
+      dismissArmyLostPopup,
+      boostAlly,
+      chargeCacheFromExtras,
+      seedRewardDemo,
+      simulateArmyLoss,
       addQuest,
       updateQuestTarget,
       removeQuest,
@@ -722,6 +940,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       breakStreakForTest,
       xpToNext,
       xpProgress,
+      unclaimedRewards,
       todayClearedCount,
       allCleared,
       clearPercent,
@@ -744,6 +963,13 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       markYesNo,
       submitDay,
       dismissAlly,
+      claimReward,
+      dismissRewardPopup,
+      dismissArmyLostPopup,
+      boostAlly,
+      chargeCacheFromExtras,
+      seedRewardDemo,
+      simulateArmyLoss,
       addQuest,
       updateQuestTarget,
       removeQuest,
@@ -752,6 +978,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       breakStreakForTest,
       xpToNext,
       xpProgress,
+      unclaimedRewards,
       todayClearedCount,
       allCleared,
       clearPercent,

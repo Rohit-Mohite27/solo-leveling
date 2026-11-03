@@ -155,6 +155,11 @@ export function StreakWarningOverlay() {
           <p className="mt-2 text-sm font-semibold text-ink-700/45">
             Current streak: {hunter.streak} day{hunter.streak === 1 ? "" : "s"}
           </p>
+          {(hunter.streak > 0 || hunter.level > 1) && (
+            <p className="mt-2 text-sm font-bold text-system-danger/85">
+              Breaking it seals your allies and shadows — you&apos;ll have to regain them.
+            </p>
+          )}
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button

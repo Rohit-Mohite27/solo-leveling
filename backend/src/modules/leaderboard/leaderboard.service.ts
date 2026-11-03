@@ -64,11 +64,14 @@ export async function getHunterRecord(hunter_id: number) {
     })),
     recentDays: logs.map((log) => {
       const day_items = items_by_log.get(log.id) ?? [];
+      const active_ids = new Set(quests.map((q) => q.id));
+      // Only active quests — soft-deleted goals must not appear as completed work
+      const visible = day_items.filter((i) => active_ids.has(i.quest_id));
       return {
         dateKey: log.date_key,
         status: log.status,
         submitted: log.submitted,
-        tasks: day_items.map((i) => ({
+        tasks: visible.map((i) => ({
           questId: i.quest_id,
           name: i.quest_name ?? `Quest #${i.quest_id}`,
           kind: i.quest_kind,

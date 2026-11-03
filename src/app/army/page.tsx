@@ -15,6 +15,7 @@ import {
   type Ally,
   type AllyFaction,
 } from "@/lib/demo-data";
+import { ALLY_BOOST_COST, ALLY_BOOST_POWER } from "@/lib/rewards";
 import { useHunter } from "@/lib/hunter-store";
 
 export default function ArmyPage() {
@@ -75,7 +76,7 @@ export default function ArmyPage() {
         <div className="relative mt-5 grid grid-cols-3 gap-2">
           <StatChip label="Recruited" value={`${stats.unlocked}/${stats.total}`} />
           <StatChip label="Shadows" value={String(stats.shadows)} />
-          <StatChip label="Allies" value={String(stats.hunters)} />
+          <StatChip label="Essence" value={String(hunter.xp)} />
         </div>
 
         <div className="relative mt-4">
@@ -89,6 +90,9 @@ export default function ArmyPage() {
               style={{ width: `${stats.percent}%` }}
             />
           </div>
+          <p className="mt-2 text-[11px] font-semibold text-white/45">
+            Open a recruit · boost with {ALLY_BOOST_COST} Essence (+{ALLY_BOOST_POWER} power)
+          </p>
         </div>
       </div>
 
@@ -123,6 +127,7 @@ export default function ArmyPage() {
           unlocked={hunters.unlocked}
           locked={hunters.locked}
           hunterLevel={hunter.level}
+          allyBoosts={hunter.allyBoosts}
           onSelect={setSelected}
         />
       )}
@@ -134,6 +139,7 @@ export default function ArmyPage() {
           unlocked={shadows.unlocked}
           locked={shadows.locked}
           hunterLevel={hunter.level}
+          allyBoosts={hunter.allyBoosts}
           onSelect={setSelected}
           dark
         />
@@ -154,6 +160,9 @@ export default function ArmyPage() {
           ally={selected}
           hunterName={hunterName}
           hunterLevel={hunter.level}
+          boostRank={hunter.allyBoosts[selected.id] ?? 0}
+          essence={hunter.xp}
+          onBoost={hunter.boostAlly}
           onClose={() => setSelected(null)}
         />
       )}
@@ -176,6 +185,7 @@ function RosterSection({
   unlocked,
   locked,
   hunterLevel,
+  allyBoosts,
   onSelect,
   dark = false,
 }: {
@@ -184,6 +194,7 @@ function RosterSection({
   unlocked: Ally[];
   locked: Ally[];
   hunterLevel: number;
+  allyBoosts: Record<string, number>;
   onSelect: (ally: Ally) => void;
   dark?: boolean;
 }) {
@@ -200,7 +211,10 @@ function RosterSection({
       <ul className="mt-3 grid grid-cols-2 gap-3">
         {rows.map(({ ally, open }) => {
           const ascension = open ? allyAscension(hunterLevel, ally) : 0;
-          const power = open ? allyPower(ally, ascension) : 0;
+          const boost = allyBoosts[ally.id] ?? 0;
+          const power = open
+            ? allyPower(ally, ascension) + boost * ALLY_BOOST_POWER
+            : 0;
           return (
             <li key={ally.id}>
               <button
@@ -258,6 +272,11 @@ function RosterSection({
                           : "Ally"}
                     </span>
                   )}
+                  {open && boost > 0 && (
+                    <span className="absolute bottom-2 right-2 rounded-full bg-[#f6d860] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#2a2458]">
+                      +{boost}
+                    </span>
+                  )}
                 </div>
                 <div className="px-3 py-2.5">
                   <p
@@ -274,6 +293,11 @@ function RosterSection({
                   >
                     {open ? `PWR ${power.toLocaleString()}` : "Sealed"}
                   </p>
+                  {open && (
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-lilac-500">
+                      Boost
+                    </p>
+                  )}
                 </div>
               </button>
             </li>

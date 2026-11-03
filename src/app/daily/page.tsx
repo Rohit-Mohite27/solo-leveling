@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IncompleteTasksModal } from "@/components/IncompleteTasksModal";
+import { DEMO_TESTING, type Quest } from "@/lib/demo-data";
 import { useHunter } from "@/lib/hunter-store";
-import type { Quest } from "@/lib/demo-data";
 
 function QuestRow({
   quest,
@@ -26,12 +25,18 @@ function QuestRow({
         <div>
           <p className="font-display text-lg text-ink-900">{quest.name}</p>
           <p className="mt-0.5 text-sm font-semibold text-ink-700/45">
-            Target: {quest.kind === "yesno" ? "Done" : `${quest.target} ${quest.unit}`}
+            {quest.kind === "yesno"
+              ? "Goal: hold the line"
+              : `Goal ${quest.target} ${quest.unit} · draft ${value}`}
           </p>
         </div>
-        {cleared && (
+        {cleared ? (
           <span className="animate-stamp-in rounded-full bg-system-clear/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-system-clear">
             Clear
+          </span>
+        ) : (
+          <span className="rounded-full bg-lilac-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-lilac-400">
+            In progress
           </span>
         )}
       </div>
@@ -86,13 +91,24 @@ export default function DailyPage() {
   const hunter = useHunter();
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
-  const [incompleteOpen, setIncompleteOpen] = useState(false);
+  /** Drafts — Save progress commits these onto Home task cards (does not lock the day). */
+  const [drafts, setDrafts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (hunter.hydrated && !hunter.entered) {
       router.replace("/");
     }
   }, [hunter.hydrated, hunter.entered, router]);
+
+  // Log is a fresh entry pad — start empty; Save adds onto Home card totals
+  useEffect(() => {
+    if (!hunter.hydrated || !hunter.entered) return;
+    const next: Record<string, number> = {};
+    for (const q of hunter.quests) {
+      next[q.id] = 0;
+    }
+    setDrafts(next);
+  }, [hunter.hydrated, hunter.entered, hunter.today.dateKey, hunter.quests]);
 
   if (!hunter.hydrated || !hunter.entered) {
     return (
@@ -102,35 +118,58 @@ export default function DailyPage() {
     );
   }
 
-  async function handleSubmit() {
-    const result = await hunter.submitDay();
-    if (result.blocked) {
-      setIncompleteOpen(true);
-      setToast(null);
+  const dayLocked = Boolean(hunter.today.submitted) && !DEMO_TESTING;
+
+  function setDraft(questId: string, value: number) {
+    setDrafts((d) => ({ ...d, [questId]: Math.max(0, value) }));
+  }
+
+  function handleSaveProgress() {
+    if (hunter.today.submitted && !DEMO_TESTING) {
+      setToast("Day already submitted — progress is locked.");
       return;
     }
-    setToast("Quest Complete — XP awarded. Streak updated.");
+    for (const q of hunter.quests) {
+      const added = drafts[q.id] ?? 0;
+      if (q.kind === "yesno") {
+        if (added >= 1) hunter.markYesNo(q.id, true);
+      } else if (added > 0) {
+        const current = hunter.today.logs[q.id]?.value ?? 0;
+        // Over-goal grind charges the next-reward cache inside setLogValue
+        hunter.setLogValue(q.id, current + added);
+      }
+    }
+    const cleared: Record<string, number> = {};
+    for (const q of hunter.quests) {
+      cleared[q.id] = 0;
+    }
+    setDrafts(cleared);
+    setToast(null);
+    router.push("/status");
   }
 
   return (
     <section className="mx-auto w-full max-w-lg px-4 pb-8 pt-2 sm:px-5">
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-lilac-400">Daily Quest</p>
-      <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Today&apos;s objectives</h1>
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-lilac-400">Daily Log</p>
+      <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Enter today&apos;s counts</h1>
       <p className="mt-2 text-base font-semibold text-ink-700/55">
-        Or just tap Done on Home — this page is for exact numbers.
+        Enter what you just did, then Save — it adds to your Home totals and clears these inputs.
+        Hit a goal to Clear; you can still log extra. Lock the day from Home with Submit day.
       </p>
 
       <ul className="mt-8 space-y-3">
         {hunter.quests.map((quest) => {
-          const log = hunter.today.logs[quest.id];
+          const value = drafts[quest.id] ?? 0;
+          const cleared =
+            quest.kind === "yesno" ? value >= 1 : value >= quest.target;
           return (
             <QuestRow
               key={quest.id}
               quest={quest}
-              value={log?.value ?? 0}
-              cleared={log?.cleared ?? false}
-              onChange={(v) => hunter.setLogValue(quest.id, v)}
-              onYesNo={(done) => hunter.markYesNo(quest.id, done)}
+              value={value}
+              cleared={cleared}
+              onChange={(v) => setDraft(quest.id, v)}
+              onYesNo={(done) => setDraft(quest.id, done ? 1 : 0)}
             />
           );
         })}
@@ -148,11 +187,11 @@ export default function DailyPage() {
       <div className="mt-8 flex flex-col gap-3">
         <button
           type="button"
-          onClick={handleSubmit}
-          disabled={hunter.quests.length === 0}
+          onClick={handleSaveProgress}
+          disabled={hunter.quests.length === 0 || dayLocked}
           className="min-h-12 rounded-2xl bg-lilac-500 font-bold uppercase tracking-[0.16em] text-white shadow-pill transition hover:bg-lilac-600 disabled:opacity-40"
         >
-          Submit day to System
+          Save progress to goals
         </button>
         <Link
           href="/status"
@@ -167,8 +206,6 @@ export default function DailyPage() {
           {toast}
         </p>
       )}
-
-      <IncompleteTasksModal open={incompleteOpen} onClose={() => setIncompleteOpen(false)} />
     </section>
   );
 }

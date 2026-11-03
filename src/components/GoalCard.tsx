@@ -5,18 +5,31 @@ import { questTargetLabel, type Quest } from "@/lib/demo-data";
 type Props = {
   quest: Quest;
   done: boolean;
+  /** Logged amount for count / distance / duration (ignored for yesno). */
+  value?: number;
   locked?: boolean;
   onToggle: () => void;
 };
 
-export function GoalCard({ quest, done, locked = false, onToggle }: Props) {
+export function GoalCard({ quest, done, value = 0, locked = false, onToggle }: Props) {
+  const isYesNo = quest.kind === "yesno";
+  // Cleared goals stay cleared — tap only marks incomplete goals done
+  const freeze = locked || done;
+  const headline = isYesNo
+    ? done
+      ? /fap/i.test(quest.name)
+        ? "Held"
+        : "Done"
+      : "Mark done"
+    : `${formatAmount(value, quest)} / ${formatAmount(quest.target, quest)}`;
+
   return (
     <button
       type="button"
       onClick={onToggle}
-      disabled={locked}
+      disabled={freeze}
       className={`soft-card relative flex min-h-[7.5rem] flex-col items-start rounded-[1.5rem] p-4 text-left transition ${
-        locked
+        freeze
           ? "cursor-default opacity-80"
           : "hover:-translate-y-0.5 hover:shadow-soft active:scale-[0.99]"
       } ${done ? "ring-2 ring-system-clear/70" : ""}`}
@@ -43,20 +56,25 @@ export function GoalCard({ quest, done, locked = false, onToggle }: Props) {
       </div>
 
       <p className="mt-4 font-body text-sm font-bold text-lilac-400">{quest.name}</p>
-      <p className="mt-1 font-display text-2xl font-semibold text-ink-900">
-        {quest.kind === "yesno"
-          ? done
-            ? /fap/i.test(quest.name)
-              ? "Held"
-              : "Done"
-            : "Mark done"
-          : done
-            ? "Done"
-            : "Not done"}
-      </p>
-      <p className="mt-1 text-xs font-semibold text-ink-700/45">{questTargetLabel(quest)}</p>
+      <p className="mt-1 font-display text-2xl font-semibold text-ink-900">{headline}</p>
+      {!isYesNo && (
+        <p className="mt-1 text-xs font-semibold text-ink-700/45">
+          {done ? `Goal hit · ${quest.unit}` : `Goal ${questTargetLabel(quest)}`}
+        </p>
+      )}
+      {isYesNo && (
+        <p className="mt-1 text-xs font-semibold text-ink-700/45">{questTargetLabel(quest)}</p>
+      )}
     </button>
   );
+}
+
+function formatAmount(n: number, quest: Quest): string {
+  if (quest.kind === "distance") {
+    const rounded = Math.round(n * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  }
+  return Math.round(n).toLocaleString("en-US");
 }
 
 function GoalIcon({ name }: { name: string }) {

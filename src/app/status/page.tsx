@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArmyTeaser } from "@/components/ArmyTeaser";
 import { DateStrip } from "@/components/DateStrip";
 import { GoalCard } from "@/components/GoalCard";
-import { IncompleteTasksModal } from "@/components/IncompleteTasksModal";
+import { SubmitDayConfirmModal } from "@/components/SubmitDayConfirmModal";
 import { StepsGoalCard } from "@/components/StepsGoalCard";
 import { HunterMascot } from "@/components/HunterMascot";
 import { forceMidnightWarning } from "@/components/StreakWarningOverlay";
@@ -16,7 +16,7 @@ import { useHunter } from "@/lib/hunter-store";
 export default function StatusPage() {
   const hunter = useHunter();
   const router = useRouter();
-  const [incompleteOpen, setIncompleteOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (hunter.hydrated && !hunter.entered) {
@@ -38,9 +38,13 @@ export default function StatusPage() {
     core.length === 0 ? 0 : Math.round((selectedDone / core.length) * 100);
   const canEdit = hunter.isTodaySelected && (DEMO_TESTING || !hunter.today.submitted);
 
-  async function handleSubmitDay() {
-    const result = await hunter.submitDay();
-    if (result.blocked) setIncompleteOpen(true);
+  async function doSubmitDay() {
+    setConfirmOpen(false);
+    await hunter.submitDay();
+  }
+
+  function handleSubmitDay() {
+    setConfirmOpen(true);
   }
 
   return (
@@ -83,7 +87,7 @@ export default function StatusPage() {
                   ? "Testing mode — day never locks"
                   : hunter.today.submitted
                     ? "Day submitted to the System"
-                    : "Tap a goal to mark done"
+                    : "Log progress — Clear when you hit the goal"
                 : "Past day — view only"}
             </p>
           </div>
@@ -100,7 +104,12 @@ export default function StatusPage() {
         </div>
       </div>
 
-      <IncompleteTasksModal open={incompleteOpen} onClose={() => setIncompleteOpen(false)} />
+      <SubmitDayConfirmModal
+        open={confirmOpen}
+        allCleared={hunter.allCleared}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void doSubmitDay()}
+      />
 
       {DEMO_TESTING && (
         <div className="soft-card mt-4 rounded-[1.25rem] px-4 py-3">
@@ -108,7 +117,7 @@ export default function StatusPage() {
             Testing tools
           </p>
           <p className="mt-1 text-xs font-semibold text-ink-700/50">
-            Preview ally greetings for day/level 2 → 3 → 4… without getting stuck.
+            Preview unlocks, seed reward chests, or force army loss.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -121,10 +130,17 @@ export default function StatusPage() {
             </button>
             <button
               type="button"
-              onClick={() => hunter.resetDemo()}
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-lilac-600 ring-1 ring-lilac-200"
+              onClick={() => hunter.seedRewardDemo()}
+              className="rounded-full bg-[#f6d860] px-3 py-1.5 text-xs font-bold text-[#2a2458] shadow-pill"
             >
-              Reset all demo data
+              Seed reward demo
+            </button>
+            <button
+              type="button"
+              onClick={() => hunter.simulateArmyLoss()}
+              className="rounded-full bg-system-danger/10 px-3 py-1.5 text-xs font-bold text-system-danger ring-1 ring-system-danger/25"
+            >
+              Test army loss
             </button>
             <button
               type="button"
@@ -132,6 +148,13 @@ export default function StatusPage() {
               className="rounded-full bg-system-danger/10 px-3 py-1.5 text-xs font-bold text-system-danger ring-1 ring-system-danger/25"
             >
               Test midnight warning
+            </button>
+            <button
+              type="button"
+              onClick={() => hunter.resetDemo()}
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-lilac-600 ring-1 ring-lilac-200"
+            >
+              Reset all demo data
             </button>
           </div>
         </div>
@@ -174,6 +197,13 @@ export default function StatusPage() {
               key={quest.id}
               quest={quest}
               done={Boolean(hunter.selectedClears[quest.id])}
+              value={
+                hunter.isTodaySelected
+                  ? hunter.today.logs[quest.id]?.value ?? 0
+                  : hunter.selectedClears[quest.id]
+                    ? quest.target
+                    : 0
+              }
               locked={!canEdit}
               onToggle={() => hunter.toggleQuestDone(quest.id)}
             />
