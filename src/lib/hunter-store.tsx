@@ -167,6 +167,15 @@ function mapApiQuest(q: ApiQuest): Quest {
   };
 }
 
+/** New goals join the task grid above Steps, not below the steps bar. */
+function insertQuestBeforeSteps(quests: Quest[], next: Quest): Quest[] {
+  if (isStepsQuest(next)) return [...quests.filter((q) => !isStepsQuest(q)), next];
+  const withoutDup = quests.filter((q) => q.id !== next.id);
+  const stepsIdx = withoutDup.findIndex((q) => isStepsQuest(q));
+  if (stepsIdx < 0) return [...withoutDup, next];
+  return [...withoutDup.slice(0, stepsIdx), next, ...withoutDup.slice(stepsIdx)];
+}
+
 function buildTodayFromApi(
   quests: Quest[],
   dateKey: string,
@@ -236,7 +245,10 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       fetchToday(hunter.id),
       fetchRecentLogs(hunter.id),
     ]);
-    const quests = questsRows.map(mapApiQuest);
+    // Keep Steps after core goals so Home grid never buries new tasks under the steps bar
+    const quests = questsRows
+      .map(mapApiQuest)
+      .sort((a, b) => Number(isStepsQuest(a)) - Number(isStepsQuest(b)));
     const today = buildTodayFromApi(
       quests,
       todayPack.date_key,
@@ -325,21 +337,47 @@ export function HunterProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      try {
-        const me = await fetchMe();
+      // Retry while Render cold-starts (members otherwise see a frozen login screen)
+      const maxAttempts = 4;
+      let lastErr: unknown = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (cancelled) return;
-        setAuthError(null);
-        await loadSessionPack(me.hunter);
-      } catch (err) {
-        if (cancelled) return;
-        if (!(err instanceof ApiError && err.status === 401)) {
-          setAuthError(err instanceof Error ? err.message : "Could not reach API");
+        try {
+          const me = await fetchMe();
+          if (cancelled) return;
+          setAuthError(null);
+          await loadSessionPack(me.hunter);
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (err instanceof ApiError && err.status === 401) break;
+          if (attempt < maxAttempts) {
+            setAuthError(
+              attempt === 1
+                ? "Waking the System… (first open can take ~30s)"
+                : `Still connecting… retry ${attempt}/${maxAttempts}`,
+            );
+            await new Promise((r) => setTimeout(r, 2500 * attempt));
+          }
+        }
+      }
+
+      if (cancelled) return;
+      if (lastErr) {
+        if (!(lastErr instanceof ApiError && lastErr.status === 401)) {
+          setAuthError(
+            lastErr instanceof Error
+              ? lastErr.message
+              : "Could not reach API — pull to refresh",
+          );
+        } else {
+          setAuthError(null);
         }
         setState(defaultState());
         setApiReady(true);
-      } finally {
-        if (!cancelled) setHydrated(true);
       }
+      setHydrated(true);
     }
 
     void hydrate();
@@ -797,7 +835,7 @@ export function HunterProvider({ children }: { children: ReactNode }) {
             const mapped = mapApiQuest(row);
             setState((s) => ({
               ...s,
-              quests: [...s.quests, mapped],
+              quests: insertQuestBeforeSteps(s.quests, mapped),
               today: {
                 ...s.today,
                 logs: {
@@ -813,10 +851,10 @@ export function HunterProvider({ children }: { children: ReactNode }) {
 
       setState((s) => {
         const id = `q${Date.now()}`;
-        const nextQuests = [...s.quests, { ...quest, id }];
+        const mapped = { ...quest, id };
         return {
           ...s,
-          quests: nextQuests,
+          quests: insertQuestBeforeSteps(s.quests, mapped),
           today: {
             ...s.today,
             logs: {

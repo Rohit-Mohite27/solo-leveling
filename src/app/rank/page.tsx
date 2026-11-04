@@ -12,7 +12,7 @@ import {
 import { DEMO_TESTING, firstName } from "@/lib/demo-data";
 import { buildDemoLeaderboard } from "@/lib/demo-leaderboard";
 import { guildInfo, toGuildMember, type GuildMember } from "@/lib/guild";
-import { POINT_RATE_ROWS } from "@/lib/guild-points";
+import { POINT_RATE_MODAL_ROWS } from "@/lib/guild-points";
 import {
   gradeFromStreak,
   gradeLabel,
@@ -187,45 +187,43 @@ function SystemPointsModal({ open, onClose }: { open: boolean; onClose: () => vo
       onClick={onClose}
     >
       <div
-        className="mx-auto flex max-h-full w-full max-w-sm flex-col overflow-hidden rounded-[1.5rem] bg-white shadow-soft animate-level-rise"
+        className="mx-auto flex w-full max-w-sm flex-col rounded-[1.5rem] bg-white p-5 shadow-soft animate-level-rise"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="overflow-y-auto overscroll-contain p-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lilac-400">
-            System notice
-          </p>
-          <h2
-            id="sp-modal-title"
-            className="mt-2 font-display text-2xl font-semibold text-ink-900"
-          >
-            How System Points work
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-ink-700/60">
-            Streak gets you into a guild. Inside the guild, workout volume decides the single
-            champion — more reps, more System Points.
-          </p>
-          <ul className="mt-4 space-y-2">
-            {POINT_RATE_ROWS.map((r) => (
-              <li
-                key={r.label}
-                className="flex items-center justify-between rounded-xl bg-lilac-50/80 px-3 py-2 text-sm font-semibold"
-              >
-                <span className="font-bold text-ink-900">{r.label}</span>
-                <span className="text-lilac-600">{r.rate}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs font-semibold text-ink-700/45">
-            Tap S / A / B to see that guild&apos;s training goals and ranked members.
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-5 min-h-11 w-full rounded-2xl bg-lilac-500 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-pill transition hover:bg-lilac-600"
-          >
-            Enter the Ranking Gate
-          </button>
-        </div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lilac-400">
+          System notice
+        </p>
+        <h2
+          id="sp-modal-title"
+          className="mt-2 font-display text-2xl font-semibold text-ink-900"
+        >
+          How System Points work
+        </h2>
+        <p className="mt-2 text-sm font-semibold text-ink-700/60">
+          Streak gets you into a guild. Inside the guild, workout volume decides the single
+          champion — more reps, more System Points.
+        </p>
+        <ul className="mt-4 space-y-1.5">
+          {POINT_RATE_MODAL_ROWS.map((r) => (
+            <li
+              key={r.label}
+              className="flex items-center justify-between rounded-xl bg-lilac-50/80 px-3 py-1.5 text-sm font-semibold"
+            >
+              <span className="font-bold text-ink-900">{r.label}</span>
+              <span className="shrink-0 text-lilac-600">{r.rate}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-[11px] font-semibold text-ink-700/40">
+          Accessories (flyes, curls…) = diary only, 0 Rank SP. Tap S / A / B for guild goals.
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 min-h-11 w-full rounded-2xl bg-lilac-500 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-pill transition hover:bg-lilac-600"
+        >
+          Enter the Ranking Gate
+        </button>
       </div>
     </div>
   );

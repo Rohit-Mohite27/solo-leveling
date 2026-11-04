@@ -172,44 +172,46 @@ export default function StatusPage() {
         </Link>
       </div>
 
+      {/* Core goals only — Steps always sits below this grid */}
       <div
         className="mt-3 grid grid-cols-2 gap-3 animate-fade-up"
         style={{ animationDelay: "0.14s" }}
       >
-        {hunter.quests.map((quest) =>
-          isStepsQuest(quest) ? (
-            <StepsGoalCard
-              key={quest.id}
-              quest={quest}
-              value={
-                hunter.isTodaySelected
-                  ? hunter.today.logs[quest.id]?.value ?? 0
-                  : hunter.selectedClears[quest.id]
-                    ? quest.target
-                    : 0
-              }
-              locked={!canEdit}
-              onUpdateSteps={(v) => hunter.setLogValue(quest.id, v)}
-              onUpdateTarget={(t) => hunter.updateQuestTarget(quest.id, t)}
-            />
-          ) : (
-            <GoalCard
-              key={quest.id}
-              quest={quest}
-              done={Boolean(hunter.selectedClears[quest.id])}
-              value={
-                hunter.isTodaySelected
-                  ? hunter.today.logs[quest.id]?.value ?? 0
-                  : hunter.selectedClears[quest.id]
-                    ? quest.target
-                    : 0
-              }
-              locked={!canEdit}
-              onToggle={() => hunter.toggleQuestDone(quest.id)}
-            />
-          ),
-        )}
+        {hunter.quests.filter((q) => !isStepsQuest(q)).map((quest) => (
+          <GoalCard
+            key={quest.id}
+            quest={quest}
+            done={Boolean(hunter.selectedClears[quest.id])}
+            value={
+              hunter.isTodaySelected
+                ? hunter.today.logs[quest.id]?.value ?? 0
+                : hunter.selectedClears[quest.id]
+                  ? quest.target
+                  : 0
+            }
+            locked={!canEdit}
+            onToggle={() => hunter.toggleQuestDone(quest.id)}
+          />
+        ))}
       </div>
+
+      {hunter.quests.filter((q) => isStepsQuest(q)).map((quest) => (
+        <div key={quest.id} className="mt-3 animate-fade-up" style={{ animationDelay: "0.16s" }}>
+          <StepsGoalCard
+            quest={quest}
+            value={
+              hunter.isTodaySelected
+                ? hunter.today.logs[quest.id]?.value ?? 0
+                : hunter.selectedClears[quest.id]
+                  ? quest.target
+                  : 0
+            }
+            locked={!canEdit}
+            onUpdateSteps={(v) => hunter.setLogValue(quest.id, v)}
+            onUpdateTarget={(t) => hunter.updateQuestTarget(quest.id, t)}
+          />
+        </div>
+      ))}
 
       {hunter.quests.length === 0 && (
         <div className="soft-card mt-6 rounded-[1.5rem] p-6 text-center">

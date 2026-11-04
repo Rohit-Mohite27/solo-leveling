@@ -57,9 +57,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Persist Bearer across visits (cookie may fail cross-site Vercel→Render).
+ * Prefer localStorage; migrate any legacy sessionStorage token.
+ * Backend session JWT TTL is 30 days — same intent here.
+ */
 export function getSessionToken(): string | null {
   try {
-    return sessionStorage.getItem(TOKEN_KEY);
+    const fromLocal = localStorage.getItem(TOKEN_KEY);
+    if (fromLocal) return fromLocal;
+    const legacy = sessionStorage.getItem(TOKEN_KEY);
+    if (legacy) {
+      localStorage.setItem(TOKEN_KEY, legacy);
+      sessionStorage.removeItem(TOKEN_KEY);
+      return legacy;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -67,8 +80,13 @@ export function getSessionToken(): string | null {
 
 export function setSessionToken(token: string | null): void {
   try {
-    if (!token) sessionStorage.removeItem(TOKEN_KEY);
-    else sessionStorage.setItem(TOKEN_KEY, token);
+    if (!token) {
+      localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY);
+    } else {
+      localStorage.setItem(TOKEN_KEY, token);
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
   } catch {
     // ignore
   }

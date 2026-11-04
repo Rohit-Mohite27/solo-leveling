@@ -20,17 +20,21 @@ import {
   type GuildMember,
 } from "@/lib/guild";
 import {
+  DAILY_SP_CAP,
   EMPTY_VOLUME,
   POINT_RATE_ROWS,
   mergeVolumes,
+  scoreDayCapped,
+  scoreDaysCapped,
   scoreVolume,
   volumeFromTasks,
+  type TaskLike,
   type WorkoutVolume,
 } from "@/lib/guild-points";
 import { useHunter } from "@/lib/hunter-store";
 
-function volumeFromLocalHunter(hunter: ReturnType<typeof useHunter>): WorkoutVolume {
-  const todayTasks = hunter.quests.map((q) => {
+function tasksToday(hunter: ReturnType<typeof useHunter>): TaskLike[] {
+  return hunter.quests.map((q) => {
     const log = hunter.today.logs[q.id];
     return {
       name: q.name,
@@ -40,7 +44,10 @@ function volumeFromLocalHunter(hunter: ReturnType<typeof useHunter>): WorkoutVol
       cleared: Boolean(log?.cleared),
     };
   });
-  let vol = volumeFromTasks(todayTasks);
+}
+
+function volumeFromLocalHunter(hunter: ReturnType<typeof useHunter>): WorkoutVolume {
+  let vol = volumeFromTasks(tasksToday(hunter));
   for (const day of hunter.history.slice(0, 7)) {
     const tasks = hunter.quests.map((q) => ({
       name: q.name,
@@ -54,6 +61,22 @@ function volumeFromLocalHunter(hunter: ReturnType<typeof useHunter>): WorkoutVol
   return vol;
 }
 
+function pointsFromLocalHunter(hunter: ReturnType<typeof useHunter>): number {
+  const days: TaskLike[][] = [tasksToday(hunter)];
+  for (const day of hunter.history.slice(0, 6)) {
+    days.push(
+      hunter.quests.map((q) => ({
+        name: q.name,
+        kind: q.kind,
+        unit: q.unit,
+        value: day.questClears[q.id] ? q.target : 0,
+        cleared: Boolean(day.questClears[q.id]),
+      })),
+    );
+  }
+  return scoreDaysCapped(days);
+}
+
 export default function GuildDetailPage() {
   const hunter = useHunter();
   const router = useRouter();
@@ -64,6 +87,7 @@ export default function GuildDetailPage() {
 
   const [rows, setRows] = useState<LeaderboardEntry[]>([]);
   const [volumes, setVolumes] = useState<Record<number, WorkoutVolume>>({});
+  const [pointsById, setPointsById] = useState<Record<number, number>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,6 +122,11 @@ export default function GuildDetailPage() {
         if (v) next[row.id] = v;
       }
       setVolumes(next);
+      const pts: Record<number, number> = {};
+      for (const [id, vol] of Object.entries(next)) {
+        pts[Number(id)] = Math.min(7 * DAILY_SP_CAP, scoreVolume(vol));
+      }
+      setPointsById(pts);
       return;
     }
 
@@ -112,19 +141,26 @@ export default function GuildDetailPage() {
             try {
               const rec = await fetchHunterRecord(r.id);
               let vol = EMPTY_VOLUME;
+              let points = 0;
               for (const day of rec.recentDays) {
                 vol = mergeVolumes(vol, volumeFromTasks(day.tasks));
+                points += scoreDayCapped(day.tasks);
               }
-              return [r.id, vol] as const;
+              return [r.id, vol, points] as const;
             } catch {
-              return [r.id, EMPTY_VOLUME] as const;
+              return [r.id, EMPTY_VOLUME, 0] as const;
             }
           }),
         );
         if (cancelled) return;
         const map: Record<number, WorkoutVolume> = {};
-        for (const [id, vol] of entries) map[id] = vol;
+        const pts: Record<number, number> = {};
+        for (const [id, vol, points] of entries) {
+          map[id] = vol;
+          pts[id] = points;
+        }
         setVolumes(map);
+        setPointsById(pts);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -150,7 +186,9 @@ export default function GuildDetailPage() {
     const id = DEMO_TESTING ? 0 : hunter.hunterId;
     if (id == null) return;
     const mine = volumeFromLocalHunter(hunter);
+    const myPoints = pointsFromLocalHunter(hunter);
     setVolumes((prev) => ({ ...prev, [id]: mine }));
+    setPointsById((prev) => ({ ...prev, [id]: myPoints }));
   }, [
     hunter.hydrated,
     hunter.entered,
@@ -164,10 +202,10 @@ export default function GuildDetailPage() {
   const members: GuildMember[] = useMemo(() => {
     if (!grade) return [];
     return membersForGrade(
-      rows.map((r) => toGuildMember(r, volumes[r.id])),
+      rows.map((r) => toGuildMember(r, volumes[r.id], pointsById[r.id])),
       grade,
     );
-  }, [rows, grade, volumes]);
+  }, [rows, grade, volumes, pointsById]);
 
   const myId = DEMO_TESTING ? 0 : hunter.hunterId;
   const champion = members[0] ?? null;
@@ -288,7 +326,8 @@ export default function GuildDetailPage() {
           ))}
         </ul>
         <p className="mt-3 text-xs font-semibold text-ink-700/45">
-          More reps = more points. Same guild, one champion.
+          Core lifts + run/sit-ups/steps count. Accessories can be logged but give 0 Rank SP.
+          Home and gym share a {DAILY_SP_CAP} SP daily cap — week total decides the champion.
         </p>
       </details>
 
@@ -354,8 +393,8 @@ export default function GuildDetailPage() {
 
       {members.some((m) => m.id === myId) && volumes[myId ?? -999] && (
         <p className="mt-4 text-center text-xs font-semibold text-ink-700/45">
-          Your volume scores {scoreVolume(volumes[myId!]!).toLocaleString("en-US")} SP this week.
-          Push the guild goals to take the throne.
+          Your Rank score is {(pointsById[myId!] ?? 0).toLocaleString("en-US")} SP this week
+          (daily cap applied). Keep logging cores + support work to take the throne.
         </p>
       )}
     </section>

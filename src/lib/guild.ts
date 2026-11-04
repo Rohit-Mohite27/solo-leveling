@@ -1,7 +1,6 @@
 import type { HunterGrade } from "@/lib/hunter-rank";
 import { gradeFromStreak, gradeLabel, gradeRequirement } from "@/lib/hunter-rank";
-import type { WorkoutVolume } from "@/lib/guild-points";
-import { scoreVolume } from "@/lib/guild-points";
+import { DAILY_SP_CAP, scoreVolume, type WorkoutVolume } from "@/lib/guild-points";
 
 export type GuildWorkout = {
   name: string;
@@ -197,13 +196,16 @@ export function toGuildMember(
     streak: number;
   },
   volume?: WorkoutVolume,
+  /** When set (e.g. sum of daily-capped SP), wins over raw volume score */
+  systemPointsOverride?: number,
 ): GuildMember {
   const v = volume;
+  const fromVolume = v ? Math.min(7 * DAILY_SP_CAP, scoreVolume(v)) : 0;
   return {
     ...row,
     grade: gradeFromStreak(row.streak),
     volume: v,
-    systemPoints: v ? scoreVolume(v) : 0,
+    systemPoints: systemPointsOverride ?? fromVolume,
   };
 }
 

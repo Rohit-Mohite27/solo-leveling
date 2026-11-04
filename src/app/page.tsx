@@ -113,7 +113,17 @@ export default function GatePage() {
           Your goals. Your streak. Rise against yourself.
         </p>
 
-        {DEMO_TESTING ? (
+        {!hydrated && (
+          <div className="mt-10 w-full max-w-sm animate-fade-up rounded-2xl bg-white/80 px-4 py-5 ring-1 ring-lilac-200">
+            <p className="font-body text-sm font-bold text-lilac-600">Opening the Gate…</p>
+            <p className="mt-2 text-xs font-semibold text-ink-700/50">
+              {authError ||
+                "If this is the first visit in a while, the server may need ~30 seconds to wake up. Don’t spam refresh."}
+            </p>
+          </div>
+        )}
+
+        {hydrated && DEMO_TESTING ? (
           <form
             onSubmit={handleDemoEnter}
             className="mt-10 flex w-full max-w-sm animate-fade-up flex-col gap-3"
@@ -142,7 +152,7 @@ export default function GatePage() {
               Enter the Gate
             </button>
           </form>
-        ) : step === "profile" ? (
+        ) : hydrated && step === "profile" ? (
           <form
             onSubmit={handleRequestOtp}
             className="mt-10 flex w-full max-w-sm animate-fade-up flex-col gap-3"
@@ -186,7 +196,7 @@ export default function GatePage() {
               {busy ? "Sending…" : "Send OTP"}
             </button>
           </form>
-        ) : (
+        ) : hydrated ? (
           <form
             onSubmit={handleVerify}
             className="mt-10 flex w-full max-w-sm animate-fade-up flex-col gap-3"
@@ -228,12 +238,21 @@ export default function GatePage() {
               Change number
             </button>
           </form>
-        )}
+        ) : null}
 
-        {(error || authError) && (
+        {hydrated && (error || authError) && (
           <p className="mt-4 font-body text-sm font-semibold text-rose-600">
             {error || authError}
           </p>
+        )}
+        {hydrated && authError && !entered && (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-3 font-body text-xs font-bold uppercase tracking-[0.16em] text-lilac-600"
+          >
+            Retry connection
+          </button>
         )}
       </div>
     </section>
