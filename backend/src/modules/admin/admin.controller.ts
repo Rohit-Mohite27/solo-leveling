@@ -88,6 +88,45 @@ export async function getHunterDay(req: Request, res: Response) {
   }
 }
 
+const save_day_body = z.object({
+  tasks: z
+    .array(
+      z.object({
+        questId: z.coerce.number().int().positive(),
+        value: z.coerce.number().min(0),
+        cleared: z.boolean(),
+      }),
+    )
+    .min(1)
+    .max(40),
+  submit: z.boolean().default(true),
+});
+
+export async function saveHunterDay(req: Request, res: Response) {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ success: false, code: "INVALID_ID", message: "Invalid hunter id" });
+      return;
+    }
+    const date_key = typeof req.params.dateKey === "string" ? req.params.dateKey : "";
+    const body = save_day_body.parse(req.body ?? {});
+    const data = await adminService.saveHunterDay(id, date_key, body);
+    res.json({ success: true, data });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        code: "BAD_REQUEST",
+        message: "Provide tasks[{ questId, value, cleared }] and optional submit",
+      });
+      return;
+    }
+    if (handleAdminError(err, res)) return;
+    throw err;
+  }
+}
+
 export async function resetHunter(req: Request, res: Response) {
   try {
     const id = parseId(req.params.id);

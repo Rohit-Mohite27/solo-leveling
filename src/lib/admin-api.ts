@@ -173,6 +173,37 @@ export async function fetchAdminHunterDay(id: number, dateKey: string) {
   );
 }
 
+export type AdminSaveDayResult = AdminHunterDetail & {
+  day: AdminHunterDay;
+  rebuilt: {
+    previous: { level: number; xp: number; streak: number };
+    level: number;
+    xp: number;
+    streak: number;
+  } | null;
+};
+
+/** Admin backfill / correct a calendar day, then rebuild XP + streak when submitted. */
+export async function saveAdminHunterDay(
+  id: number,
+  dateKey: string,
+  input: {
+    tasks: Array<{ questId: number; value: number; cleared: boolean }>;
+    submit?: boolean;
+  },
+) {
+  return adminFetch<AdminSaveDayResult>(
+    `/api/v1/admin/hunters/${id}/days/${encodeURIComponent(dateKey)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        tasks: input.tasks,
+        submit: input.submit ?? true,
+      }),
+    },
+  );
+}
+
 export async function resetAdminHunter(id: number) {
   return adminFetch<AdminHunterDetail>(`/api/v1/admin/hunters/${id}/reset`, {
     method: "POST",

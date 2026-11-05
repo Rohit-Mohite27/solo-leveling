@@ -12,9 +12,21 @@ import {
   fetchAdminHunterDay,
   resetAdminHunter,
   resetAdminHunterDates,
+  saveAdminHunterDay,
   type AdminHunterDay,
   type AdminHunterDetail,
 } from "@/lib/admin-api";
+
+type EditTask = {
+  questId: number;
+  name: string;
+  kind: string | null;
+  unit: string | null;
+  target: string | null;
+  value: string;
+  cleared: boolean;
+  active: boolean;
+};
 
 function DayDetailModal({
   open,
@@ -24,6 +36,7 @@ function DayDetailModal({
   busy,
   onClose,
   onResetDay,
+  onSaveSubmit,
 }: {
   open: boolean;
   hunterName: string;
@@ -32,8 +45,34 @@ function DayDetailModal({
   busy: boolean;
   onClose: () => void;
   onResetDay: () => void;
+  onSaveSubmit: (tasks: EditTask[]) => void;
 }) {
+  const [edits, setEdits] = useState<EditTask[]>([]);
+
+  useEffect(() => {
+    if (!day) {
+      setEdits([]);
+      return;
+    }
+    setEdits(
+      day.tasks.map((t) => ({
+        questId: t.questId,
+        name: t.name,
+        kind: t.kind,
+        unit: t.unit,
+        target: t.target,
+        value: t.value,
+        cleared: t.cleared,
+        active: t.active,
+      })),
+    );
+  }, [day]);
+
   if (!open) return null;
+
+  function setTask(questId: number, patch: Partial<EditTask>) {
+    setEdits((prev) => prev.map((t) => (t.questId === questId ? { ...t, ...patch } : t)));
+  }
 
   return (
     <div
@@ -49,7 +88,7 @@ function DayDetailModal({
       >
         <div className="overflow-y-auto p-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-lilac-400">
-            Day log · {hunterName}
+            Enter / edit day · {hunterName}
           </p>
           <h2
             id="day-detail-title"
@@ -63,54 +102,101 @@ function DayDetailModal({
               {day.submitted ? " · submitted" : " · not submitted"}
             </p>
           )}
+          <p className="mt-2 text-xs font-semibold text-ink-700/45">
+            Use this when a hunter missed midnight. Fill their tasks, then save &amp; submit so
+            streak and XP rebuild.
+          </p>
 
           {loading && <p className="mt-6 text-sm font-semibold text-lilac-400">Loading records…</p>}
 
-          {!loading && day && day.tasks.length === 0 && (
-            <p className="mt-6 text-sm font-semibold text-ink-700/45">No task values logged this day.</p>
+          {!loading && edits.length === 0 && (
+            <p className="mt-6 text-sm font-semibold text-ink-700/45">
+              No active quests on this hunter.
+            </p>
           )}
 
-          {!loading && day && day.tasks.length > 0 && (
-            <ul className="mt-5 space-y-2">
-              {day.tasks.map((t) => (
+          {!loading && edits.length > 0 && (
+            <ul className="mt-5 space-y-3">
+              {edits.map((t) => (
                 <li
-                  key={`${day.dateKey}-${t.questId}`}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-lilac-50/80 px-3 py-2.5"
+                  key={`${day?.dateKey}-${t.questId}`}
+                  className="rounded-xl bg-lilac-50/80 px-3 py-2.5"
                 >
-                  <div className="min-w-0">
-                    <p className="font-display text-base text-ink-900">
-                      {t.name}
-                      {!t.active ? (
-                        <span className="ml-2 text-[10px] font-bold uppercase text-ink-700/35">
-                          removed
-                        </span>
-                      ) : null}
-                    </p>
-                    {t.kind !== "yesno" && t.target ? (
-                      <p className="text-[10px] font-semibold text-ink-700/40">
-                        Goal {t.target}
-                        {t.unit ? ` ${t.unit}` : ""}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-display text-base text-ink-900">
+                        {t.name}
+                        {!t.active ? (
+                          <span className="ml-2 text-[10px] font-bold uppercase text-ink-700/35">
+                            removed
+                          </span>
+                        ) : null}
                       </p>
-                    ) : null}
+                      {t.kind !== "yesno" && t.target ? (
+                        <p className="text-[10px] font-semibold text-ink-700/40">
+                          Goal {t.target}
+                          {t.unit ? ` ${t.unit}` : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                    <label className="flex shrink-0 items-center gap-1.5 text-xs font-bold text-lilac-600">
+                      <input
+                        type="checkbox"
+                        checked={t.cleared}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const cleared = e.target.checked;
+                          if (t.kind === "yesno") {
+                            setTask(t.questId, { cleared, value: cleared ? "1" : "0" });
+                          } else {
+                            setTask(t.questId, { cleared });
+                          }
+                        }}
+                        className="accent-lilac-500"
+                      />
+                      Cleared
+                    </label>
                   </div>
-                  <span
-                    className={`shrink-0 text-sm font-bold ${
-                      t.cleared ? "text-system-clear" : "text-lilac-600"
-                    }`}
-                  >
-                    {t.kind === "yesno"
-                      ? t.cleared || t.value === "1"
-                        ? "Held"
-                        : "Open"
-                      : `${t.value}${t.unit ? ` ${t.unit}` : ""}`}
-                    {t.cleared ? " ✓" : ""}
-                  </span>
+                  {t.kind === "yesno" ? (
+                    <p className="mt-2 text-sm font-bold text-ink-800">
+                      {t.cleared ? "Held" : "Not held"}
+                    </p>
+                  ) : (
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      disabled={busy}
+                      value={t.value}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const num = Number(value);
+                        const target = Number(t.target ?? 0);
+                        const cleared =
+                          t.kind === "steps"
+                            ? t.cleared
+                            : Number.isFinite(num) && target > 0
+                              ? num >= target
+                              : t.cleared;
+                        setTask(t.questId, { value, cleared });
+                      }}
+                      className="mt-2 min-h-10 w-full rounded-xl border border-lilac-200 bg-white px-3 text-sm font-semibold text-ink-900 outline-none focus:border-lilac-400"
+                    />
+                  )}
                 </li>
               ))}
             </ul>
           )}
 
           <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={busy || loading || edits.length === 0}
+              onClick={() => onSaveSubmit(edits)}
+              className="min-h-11 w-full rounded-2xl bg-lilac-500 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-pill transition hover:bg-lilac-600 disabled:opacity-40"
+            >
+              {busy ? "Saving…" : "Save & submit report"}
+            </button>
             <button
               type="button"
               disabled={busy || loading || !day}
@@ -122,7 +208,7 @@ function DayDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 w-full rounded-2xl bg-lilac-500 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-pill"
+              className="min-h-11 w-full rounded-2xl bg-white text-sm font-bold uppercase tracking-[0.14em] text-lilac-600 ring-1 ring-lilac-200"
             >
               Close
             </button>
@@ -187,6 +273,40 @@ export default function AdminHunterDetailPage() {
     }
   }
 
+  async function handleSaveSubmit(tasks: EditTask[]) {
+    if (!dayDetail || !data) return;
+    const ok = window.confirm(
+      `Save & submit ${data.hunter.name}'s report for ${dayDetail.dateKey}?\n\nThis writes the day to the live DB and rebuilds level, XP, and streak.`,
+    );
+    if (!ok) return;
+    setDayBusy(true);
+    setError(null);
+    try {
+      const next = await saveAdminHunterDay(id, dayDetail.dateKey, {
+        submit: true,
+        tasks: tasks.map((t) => ({
+          questId: t.questId,
+          value: Number(t.value) || 0,
+          cleared: t.cleared,
+        })),
+      });
+      setData(next);
+      setDayDetail(next.day);
+      if (next.rebuilt) {
+        const { previous: prev, level, xp, streak } = next.rebuilt;
+        window.alert(
+          `Submitted ${dayDetail.dateKey}.\n\nLevel ${prev.level}→${level}\nXP ${prev.xp}→${xp}\nStreak ${prev.streak}→${streak}`,
+        );
+      } else {
+        window.alert(`Saved ${dayDetail.dateKey}.`);
+      }
+    } catch (err) {
+      setError(err instanceof AdminApiError ? err.message : "Save day failed");
+    } finally {
+      setDayBusy(false);
+    }
+  }
+
   async function handleResetOpenedDay() {
     if (!dayDetail || !data) return;
     const ok = window.confirm(
@@ -241,9 +361,7 @@ export default function AdminHunterDetailPage() {
       `Remove ${data.hunter.name} permanently?\n\nThis deletes their account, quests, and daily logs. This cannot be undone.`,
     );
     if (!ok) return;
-    const typed = window.prompt(
-      `Type REMOVE to confirm deleting ${data.hunter.name}:`,
-    );
+    const typed = window.prompt(`Type REMOVE to confirm deleting ${data.hunter.name}:`);
     if (typed?.trim().toUpperCase() !== "REMOVE") {
       setError("Removal cancelled — type REMOVE to confirm.");
       return;
@@ -263,15 +381,14 @@ export default function AdminHunterDetailPage() {
     setSelectedDates((prev) => ({ ...prev, [dateKey]: !prev[dateKey] }));
   }
 
-  function addExtraDate() {
+  function openExtraDate() {
     const key = extraDate.trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
-      setError("Use YYYY-MM-DD for the extra date.");
+      setError("Use YYYY-MM-DD for the missed day.");
       return;
     }
-    setSelectedDates((prev) => ({ ...prev, [key]: true }));
-    setExtraDate("");
     setError(null);
+    void openDay(key);
   }
 
   async function handleClearDates() {
@@ -389,12 +506,28 @@ export default function AdminHunterDetailPage() {
           </ul>
 
           <h3 className="mt-8 text-xs font-bold uppercase tracking-[0.18em] text-lilac-400">
-            Recent days
+            Missed day / recent days
           </h3>
           <p className="mt-1 text-xs font-semibold text-ink-700/45">
-            Tap a date to see what they logged. Clearing a day forgets it — log, XP, and streak
-            are rebuilt from the days that remain.
+            Pick a date to enter a missed report (keeps streak alive). Or open a listed day to edit /
+            submit. Clearing a day forgets it and rebuilds XP + streak.
           </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              type="date"
+              value={extraDate}
+              onChange={(e) => setExtraDate(e.target.value)}
+              className="min-h-11 flex-1 rounded-xl border border-lilac-200 bg-white px-3 font-semibold text-ink-900 outline-none focus:border-lilac-400"
+            />
+            <button
+              type="button"
+              onClick={openExtraDate}
+              className="min-h-11 rounded-xl bg-lilac-500 px-4 text-xs font-bold uppercase tracking-wide text-white shadow-pill"
+            >
+              Enter missed day
+            </button>
+          </div>
 
           <ul className="mt-3 space-y-2">
             {data.recentLogs.length === 0 && (
@@ -422,28 +555,12 @@ export default function AdminHunterDetailPage() {
                   <span className="text-xs font-semibold text-ink-700/50">
                     {l.status}
                     {l.submitted ? " · submitted" : ""}
-                    <span className="ml-2 text-lilac-500">View</span>
+                    <span className="ml-2 text-lilac-500">Edit</span>
                   </span>
                 </button>
               </li>
             ))}
           </ul>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <input
-              type="date"
-              value={extraDate}
-              onChange={(e) => setExtraDate(e.target.value)}
-              className="min-h-11 flex-1 rounded-xl border border-lilac-200 bg-white px-3 font-semibold text-ink-900 outline-none focus:border-lilac-400"
-            />
-            <button
-              type="button"
-              onClick={addExtraDate}
-              className="min-h-11 rounded-xl bg-white px-4 text-xs font-bold uppercase tracking-wide text-lilac-600 ring-1 ring-lilac-200"
-            >
-              Add date
-            </button>
-          </div>
 
           {selectedCount > 0 && (
             <p className="mt-2 text-xs font-semibold text-lilac-500">
@@ -485,6 +602,7 @@ export default function AdminHunterDetailPage() {
           setDayDetail(null);
         }}
         onResetDay={() => void handleResetOpenedDay()}
+        onSaveSubmit={(tasks) => void handleSaveSubmit(tasks)}
       />
     </AdminShell>
   );

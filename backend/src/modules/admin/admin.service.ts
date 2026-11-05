@@ -1,8 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { env } from "../../config/env.js";
 import { getHealthStatus } from "../health/health.service.js";
+import * as dailyLogsRepository from "../daily-logs/daily-logs.repository.js";
 import * as dailyLogsService from "../daily-logs/daily-logs.service.js";
 import * as adminRepository from "./admin.repository.js";
+
+const date_key_re = /^\d{4}-\d{2}-\d{2}$/;
 
 export class AdminError extends Error {
   constructor(
@@ -158,31 +161,40 @@ export async function getHunterDay(hunter_id: number, date_key: string) {
     throw new AdminError("BAD_REQUEST", "Invalid date key", 400);
   }
 
+  const quests = await adminRepository.listQuests(hunter_id);
   const log = await adminRepository.findLogByDate(hunter_id, date_key);
-  if (!log) {
-    return {
-      dateKey: date_key,
-      status: "empty" as const,
-      submitted: false,
-      tasks: [] as Array<{
-        questId: number;
-        name: string;
-        kind: string | null;
-        unit: string | null;
-        target: string | null;
-        value: string;
-        cleared: boolean;
-        active: boolean;
-      }>,
-    };
-  }
+  const items = log ? await adminRepository.listItemsForLog(log.id) : [];
+  const item_by_quest = new Map(items.map((i) => [i.quest_id, i]));
 
-  const items = await adminRepository.listItemsForLog(log.id);
-  return {
-    dateKey: log.date_key,
-    status: log.status,
-    submitted: log.submitted,
-    tasks: items.map((i) => ({
+  type TaskRow = {
+    questId: number;
+    name: string;
+    kind: string | null;
+    unit: string | null;
+    target: string | null;
+    value: string;
+    cleared: boolean;
+    active: boolean;
+  };
+
+  const tasks: TaskRow[] = quests.map((q) => {
+    const item = item_by_quest.get(q.id);
+    return {
+      questId: q.id,
+      name: q.name,
+      kind: q.kind,
+      unit: q.unit,
+      target: q.target,
+      value: item?.value ?? "0",
+      cleared: item?.cleared ?? false,
+      active: true,
+    };
+  });
+
+  // Keep orphan rows for soft-deleted quests that still have values that day
+  for (const i of items) {
+    if (tasks.some((t) => t.questId === i.quest_id)) continue;
+    tasks.push({
       questId: i.quest_id,
       name: i.quest_name ?? `Quest #${i.quest_id}`,
       kind: i.quest_kind,
@@ -191,7 +203,97 @@ export async function getHunterDay(hunter_id: number, date_key: string) {
       value: i.value,
       cleared: i.cleared,
       active: Boolean(i.quest_active),
-    })),
+    });
+  }
+
+  return {
+    dateKey: date_key,
+    status: log?.status ?? ("empty" as const),
+    submitted: log?.submitted ?? false,
+    tasks,
+  };
+}
+
+/**
+ * Admin backfill / correct a calendar day (missed midnight submit).
+ * Writes task values, optionally marks submitted, then rebuilds XP + streak.
+ */
+export async function saveHunterDay(
+  hunter_id: number,
+  date_key: string,
+  input: {
+    tasks: Array<{ questId: number; value: number; cleared: boolean }>;
+    submit: boolean;
+  },
+) {
+  const hunter = await adminRepository.findHunter(hunter_id);
+  if (!hunter) throw new AdminError("NOT_FOUND", "Hunter not found", 404);
+  if (!date_key_re.test(date_key)) {
+    throw new AdminError("BAD_REQUEST", "Invalid date key (YYYY-MM-DD)", 400);
+  }
+
+  const today = dailyLogsService.todayKeyIst();
+  if (date_key > today) {
+    throw new AdminError("BAD_REQUEST", "Cannot enter a future day", 400);
+  }
+
+  const quests = await adminRepository.listQuests(hunter_id);
+  const quest_ids = new Set(quests.map((q) => q.id));
+  if (input.tasks.length === 0) {
+    throw new AdminError("BAD_REQUEST", "Provide at least one task value", 400);
+  }
+  for (const t of input.tasks) {
+    if (!quest_ids.has(t.questId)) {
+      throw new AdminError("BAD_REQUEST", `Quest ${t.questId} is not on this hunter`, 400);
+    }
+    if (!Number.isFinite(t.value) || t.value < 0) {
+      throw new AdminError("BAD_REQUEST", "Task values must be >= 0", 400);
+    }
+  }
+
+  for (const t of input.tasks) {
+    await dailyLogsRepository.upsertLogItem(hunter_id, date_key, t.questId, {
+      value: String(t.value),
+      cleared: t.cleared,
+    });
+  }
+
+  const log = await dailyLogsRepository.getOrCreateDailyLog(hunter_id, date_key);
+  const items = await dailyLogsRepository.listItemsForLog(log.id);
+  const item_by_quest = new Map(items.map((i) => [i.quest_id, i]));
+  const core = quests.filter((q) => q.kind !== "steps");
+  const cleared_core = core.filter((q) => item_by_quest.get(q.id)?.cleared).length;
+
+  if (input.submit) {
+    if (core.length === 0 || cleared_core === 0) {
+      throw new AdminError(
+        "NO_PROGRESS",
+        "Mark at least one core task cleared (No Fap counts) before submitting",
+        400,
+      );
+    }
+    const status = cleared_core === core.length ? "complete" : "partial";
+    await dailyLogsRepository.markSubmitted(log.id, status);
+  }
+
+  const should_rebuild = input.submit || log.submitted;
+  const rebuilt = should_rebuild
+    ? await dailyLogsService.rebuildHunterProgressFromLogs(hunter_id)
+    : null;
+
+  const day = await getHunterDay(hunter_id, date_key);
+  const detail = await getHunterDetail(hunter_id);
+  return {
+    ...detail,
+    day,
+    rebuilt: rebuilt
+      ? {
+          previous: rebuilt.previous,
+          level: rebuilt.level,
+          xp: rebuilt.xp,
+          streak: rebuilt.streak,
+        }
+      : null,
   };
 }
 
@@ -202,8 +304,6 @@ export async function resetHunter(hunter_id: number) {
   await adminRepository.insertStarterQuests(hunter_id);
   return getHunterDetail(hunter_id);
 }
-
-const date_key_re = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function resetHunterDates(hunter_id: number, date_keys: string[]) {
   const hunter = await adminRepository.findHunter(hunter_id);

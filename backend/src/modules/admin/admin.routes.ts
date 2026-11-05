@@ -14,6 +14,7 @@ import {
   recalcNoFapStreaks,
   resetHunter,
   resetHunterDates,
+  saveHunterDay,
 } from "./admin.controller.js";
 
 export const adminRouter = Router();
@@ -28,6 +29,7 @@ adminRouter.get("/overview", requireAdmin, asyncHandler(overview));
 adminRouter.get("/hunters", requireAdmin, asyncHandler(listHunters));
 adminRouter.get("/hunters/:id", requireAdmin, asyncHandler(getHunter));
 adminRouter.get("/hunters/:id/days/:dateKey", requireAdmin, asyncHandler(getHunterDay));
+adminRouter.put("/hunters/:id/days/:dateKey", requireAdmin, asyncHandler(saveHunterDay));
 adminRouter.post("/hunters/:id/reset", requireAdmin, asyncHandler(resetHunter));
 adminRouter.post("/hunters/:id/reset-dates", requireAdmin, asyncHandler(resetHunterDates));
 adminRouter.delete("/hunters/:id", requireAdmin, asyncHandler(deleteHunter));
