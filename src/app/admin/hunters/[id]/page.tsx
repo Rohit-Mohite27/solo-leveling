@@ -204,6 +204,12 @@ export default function AdminHunterDetailPage() {
         delete copy[dayDetail.dateKey];
         return copy;
       });
+      if (next.rebuilt) {
+        const { previous: prev, level, xp, streak } = next.rebuilt;
+        window.alert(
+          `Forgot ${dayDetail.dateKey}.\n\nLevel ${prev.level}→${level}\nXP ${prev.xp}→${xp}\nStreak ${prev.streak}→${streak}`,
+        );
+      }
     } catch (err) {
       setError(err instanceof AdminApiError ? err.message : "Reset day failed");
     } finally {
@@ -287,6 +293,16 @@ export default function AdminHunterDetailPage() {
       const next = await resetAdminHunterDates(id, keys);
       setData(next);
       setSelectedDates({});
+      if (next.rebuilt) {
+        const { previous: prev, level, xp, streak } = next.rebuilt;
+        window.alert(
+          `Forgot ${keys.join(", ")}.\n\nLevel ${prev.level}→${level}\nXP ${prev.xp}→${xp}\nStreak ${prev.streak}→${streak}`,
+        );
+      } else {
+        window.alert(
+          "Day log cleared, but streak/XP were not rebuilt. The API may be on an old deploy — redeploy the backend.",
+        );
+      }
     } catch (err) {
       setError(err instanceof AdminApiError ? err.message : "Clear dates failed");
     } finally {
