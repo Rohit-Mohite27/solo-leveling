@@ -192,3 +192,89 @@ export async function recalcHunterNoFapStreak(hunter_id: number) {
   });
   return { hunter: updated, previous_streak: hunter.streak, streak };
 }
+
+function applyXpGain(level: number, xp: number, xp_gain: number) {
+  let next_level = level;
+  let next_xp = xp + xp_gain;
+  while (next_xp >= xpForLevel(next_level)) {
+    next_xp -= xpForLevel(next_level);
+    next_level += 1;
+  }
+  return { level: next_level, xp: next_xp };
+}
+
+/**
+ * After admin forgets day(s): replay remaining submitted logs for XP/level,
+ * then set streak from calendar No Fap holds (gaps break the chain).
+ */
+export async function rebuildHunterProgressFromLogs(hunter_id: number) {
+  const hunter = await huntersRepository.findHunterById(hunter_id);
+  if (!hunter) throw new Error("Hunter not found");
+
+  const pack = await questsRepository.findAllQuestsByHunterId(hunter_id);
+  const quest_by_id = new Map(pack.map((q) => [q.id, q]));
+  const no_fap_ids = new Set(pack.filter(isNoFapQuest).map((q) => q.id));
+
+  const logs = await dailyLogsRepository.listRecentLogs(hunter_id, 400);
+  const submitted = [...logs]
+    .filter((l) => l.submitted)
+    .sort((a, b) => a.date_key.localeCompare(b.date_key));
+
+  let level = 1;
+  let xp = 0;
+  let run_streak = 0;
+  let prev_held_date: string | null = null;
+  const held_by_date = new Map<string, boolean>();
+
+  for (const log of submitted) {
+    const items = await dailyLogsRepository.listItemsForLog(log.id);
+    const cleared_core = items.filter((i) => {
+      if (!i.cleared) return false;
+      const q = quest_by_id.get(i.quest_id);
+      return !q || q.kind !== "steps";
+    }).length;
+
+    const no_fap_held = items.some((i) => no_fap_ids.has(i.quest_id) && i.cleared);
+    held_by_date.set(log.date_key, no_fap_held);
+
+    if (no_fap_held) {
+      if (prev_held_date && shiftDateKey(prev_held_date, 1) === log.date_key) {
+        run_streak += 1;
+      } else {
+        run_streak = 1;
+      }
+      prev_held_date = log.date_key;
+    } else {
+      run_streak = 0;
+      prev_held_date = null;
+    }
+
+    const all_clear = log.status === "complete";
+    let xp_gain = cleared_core * 25;
+    if (all_clear) {
+      xp_gain += 40;
+      if (run_streak > 1) xp_gain += Math.min(50, run_streak * 5);
+    } else if (no_fap_held && run_streak > 1) {
+      xp_gain += Math.min(50, run_streak * 5);
+    }
+
+    const next = applyXpGain(level, xp, xp_gain);
+    level = next.level;
+    xp = next.xp;
+  }
+
+  const streak = countNoFapStreak({ as_of: todayKeyIst(), held_by_date });
+  const updated = await huntersRepository.updateHunterProgress(hunter_id, {
+    level,
+    xp,
+    streak,
+  });
+
+  return {
+    hunter: updated,
+    previous: { level: hunter.level, xp: hunter.xp, streak: hunter.streak },
+    level,
+    xp,
+    streak,
+  };
+}

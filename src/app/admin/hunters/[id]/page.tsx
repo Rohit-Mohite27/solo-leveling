@@ -117,7 +117,7 @@ function DayDetailModal({
               onClick={onResetDay}
               className="min-h-11 w-full rounded-2xl bg-system-danger/10 text-sm font-bold uppercase tracking-wide text-system-danger ring-1 ring-system-danger/30 transition hover:bg-system-danger/15 disabled:opacity-40"
             >
-              {busy ? "Resetting…" : "Reset this day’s data"}
+              {busy ? "Forgetting…" : "Forget this day (log + XP + streak)"}
             </button>
             <button
               type="button"
@@ -190,7 +190,7 @@ export default function AdminHunterDetailPage() {
   async function handleResetOpenedDay() {
     if (!dayDetail || !data) return;
     const ok = window.confirm(
-      `Reset ${data.hunter.name}'s log for ${dayDetail.dateKey}?\n\nOnly this day’s records are deleted.`,
+      `Forget ${data.hunter.name}'s ${dayDetail.dateKey}?\n\nDeletes that day’s log and rebuilds level, XP, and streak as if that day never happened.`,
     );
     if (!ok) return;
     setDayBusy(true);
@@ -278,7 +278,7 @@ export default function AdminHunterDetailPage() {
       return;
     }
     const ok = window.confirm(
-      `Clear log data for ${data.hunter.name} on:\n${keys.join(", ")}\n\nLevel / XP / streak stay the same.`,
+      `Forget these days for ${data.hunter.name}:\n${keys.join(", ")}\n\nDeletes those logs and rebuilds level, XP, and streak as if those days never happened.`,
     );
     if (!ok) return;
     setClearingDates(true);
@@ -376,7 +376,8 @@ export default function AdminHunterDetailPage() {
             Recent days
           </h3>
           <p className="mt-1 text-xs font-semibold text-ink-700/45">
-            Tap a date to see what they logged. Use the checkbox to clear several days at once.
+            Tap a date to see what they logged. Clearing a day forgets it — log, XP, and streak
+            are rebuilt from the days that remain.
           </p>
 
           <ul className="mt-3 space-y-2">

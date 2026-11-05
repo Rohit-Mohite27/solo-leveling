@@ -220,8 +220,20 @@ export async function resetHunterDates(hunter_id: number, date_keys: string[]) {
   }
 
   const result = await adminRepository.deleteHunterLogsByDates(hunter_id, cleaned);
+  // Forget those days fully — rebuild level/XP/streak from what remains
+  const rebuilt = await dailyLogsService.rebuildHunterProgressFromLogs(hunter_id);
   const detail = await getHunterDetail(hunter_id);
-  return { ...detail, clearedDates: result.dateKeys, clearedCount: result.deleted };
+  return {
+    ...detail,
+    clearedDates: result.dateKeys,
+    clearedCount: result.deleted,
+    rebuilt: {
+      previous: rebuilt.previous,
+      level: rebuilt.level,
+      xp: rebuilt.xp,
+      streak: rebuilt.streak,
+    },
+  };
 }
 
 export async function deleteHunter(hunter_id: number) {

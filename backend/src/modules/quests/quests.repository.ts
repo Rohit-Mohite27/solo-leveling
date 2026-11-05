@@ -10,6 +10,15 @@ export async function findQuestsByHunterId(hunter_id: number) {
     .orderBy(asc(quests.sort_order), asc(quests.id));
 }
 
+/** Active + soft-deleted — needed when replaying historical day XP. */
+export async function findAllQuestsByHunterId(hunter_id: number) {
+  return db
+    .select()
+    .from(quests)
+    .where(eq(quests.hunter_id, hunter_id))
+    .orderBy(asc(quests.sort_order), asc(quests.id));
+}
+
 /** One-shot rename for hunters seeded with the old Gym Session starter. */
 export async function renameGymSessionToNoFap(hunter_id: number) {
   await db

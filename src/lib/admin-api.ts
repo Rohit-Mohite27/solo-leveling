@@ -180,13 +180,21 @@ export async function resetAdminHunter(id: number) {
 }
 
 export async function resetAdminHunterDates(id: number, dateKeys: string[]) {
-  return adminFetch<AdminHunterDetail & { clearedDates: string[]; clearedCount: number }>(
-    `/api/v1/admin/hunters/${id}/reset-dates`,
-    {
-      method: "POST",
-      body: JSON.stringify({ dateKeys }),
-    },
-  );
+  return adminFetch<
+    AdminHunterDetail & {
+      clearedDates: string[];
+      clearedCount: number;
+      rebuilt?: {
+        previous: { level: number; xp: number; streak: number };
+        level: number;
+        xp: number;
+        streak: number;
+      };
+    }
+  >(`/api/v1/admin/hunters/${id}/reset-dates`, {
+    method: "POST",
+    body: JSON.stringify({ dateKeys }),
+  });
 }
 
 export async function deleteAdminHunter(id: number) {

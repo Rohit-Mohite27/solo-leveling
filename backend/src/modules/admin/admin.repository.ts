@@ -119,7 +119,7 @@ export async function resetHunterProgress(hunter_id: number) {
   await db.update(hunters).set({ level: 1, xp: 0, streak: 0 }).where(eq(hunters.id, hunter_id));
 }
 
-/** Delete one or more calendar days of logs for a hunter (XP/level/streak unchanged). */
+/** Delete one or more calendar days of logs for a hunter. Caller must rebuild XP/streak. */
 export async function deleteHunterLogsByDates(hunter_id: number, date_keys: string[]) {
   const keys = [...new Set(date_keys.map((k) => k.trim()).filter(Boolean))];
   if (keys.length === 0) return { deleted: 0 as const, dateKeys: [] as string[] };
