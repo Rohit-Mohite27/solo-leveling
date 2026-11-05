@@ -382,9 +382,12 @@ export function personalizeLine(line: string, hunterName: string): string {
   return line.replaceAll("{name}", firstName(hunterName));
 }
 
-/** Demo / testing: skip locking the day so you can re-clear endlessly.
- * When true, gate must be name-only (no OTP / phone). */
-export const DEMO_TESTING = true;
+/**
+ * Demo / testing: name-only gate, no OTP, day never locks.
+ * true only under `next dev` (NODE_ENV=development).
+ * Production / Vercel builds are always live OTP + API — never flip this by hand.
+ */
+export const DEMO_TESTING = process.env.NODE_ENV === "development";
 
 export function todayKey(date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
