@@ -10,7 +10,13 @@ import { SubmitDayConfirmModal } from "@/components/SubmitDayConfirmModal";
 import { StepsGoalCard } from "@/components/StepsGoalCard";
 import { HunterMascot } from "@/components/HunterMascot";
 import { forceMidnightWarning } from "@/components/StreakWarningOverlay";
-import { DEMO_TESTING, coreQuests, firstName, isStepsQuest } from "@/lib/demo-data";
+import {
+  DEMO_TESTING,
+  coreQuests,
+  firstName,
+  isNoFapQuest,
+  isStepsQuest,
+} from "@/lib/demo-data";
 import { useHunter } from "@/lib/hunter-store";
 
 export default function StatusPage() {
@@ -37,6 +43,7 @@ export default function StatusPage() {
   const selectedPct =
     core.length === 0 ? 0 : Math.round((selectedDone / core.length) * 100);
   const canEdit = hunter.isTodaySelected && (DEMO_TESTING || !hunter.today.submitted);
+  const canSubmit = canEdit && selectedDone >= 1;
 
   async function doSubmitDay() {
     setConfirmOpen(false);
@@ -44,6 +51,7 @@ export default function StatusPage() {
   }
 
   function handleSubmitDay() {
+    if (selectedDone < 1) return;
     setConfirmOpen(true);
   }
 
@@ -87,7 +95,9 @@ export default function StatusPage() {
                   ? "Testing mode — day never locks"
                   : hunter.today.submitted
                     ? "Day submitted to the System"
-                    : "Log progress — Clear when you hit the goal"
+                    : selectedDone < 1
+                      ? "Clear at least one task to submit (No Fap counts)"
+                      : "Log progress — Clear when you hit the goal"
                 : "Past day — view only"}
             </p>
           </div>
@@ -95,7 +105,12 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => void handleSubmitDay()}
-              disabled={hunter.quests.length === 0}
+              disabled={!canSubmit}
+              title={
+                selectedDone < 1
+                  ? "Clear at least one task before submitting"
+                  : "Submit day"
+              }
               className="rounded-full bg-lilac-500 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-pill transition hover:bg-lilac-600 disabled:opacity-40"
             >
               Submit day
@@ -106,7 +121,9 @@ export default function StatusPage() {
 
       <SubmitDayConfirmModal
         open={confirmOpen}
-        allCleared={hunter.allCleared}
+        noFapHeld={hunter.quests.some(
+          (q) => isNoFapQuest(q) && hunter.selectedClears[q.id],
+        )}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void doSubmitDay()}
       />

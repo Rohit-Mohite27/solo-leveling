@@ -384,7 +384,7 @@ export function personalizeLine(line: string, hunterName: string): string {
 
 /** Demo / testing: skip locking the day so you can re-clear endlessly.
  * When true, gate must be name-only (no OTP / phone). */
-export const DEMO_TESTING = false;
+export const DEMO_TESTING = true;
 
 export function todayKey(date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -433,7 +433,16 @@ export function isStepsQuest(quest: Quest): boolean {
   return quest.kind === "steps" || quest.unit === "steps";
 }
 
-/** Core daily quests that count for streak / day clear (steps are optional). */
+/** Streak is driven by this quest only (held → +1, broken → 0). */
+export function isNoFapQuest(quest: { name: string; kind: string }): boolean {
+  const n = quest.name.trim().toLowerCase().replace(/[-_]/g, " ");
+  return (
+    quest.kind === "yesno" &&
+    (n.includes("no fap") || n.includes("nofap") || n === "gym session")
+  );
+}
+
+/** Core daily quests for day-clear XP (steps are optional). Streak uses No Fap alone. */
 export function coreQuests(quests: Quest[]): Quest[] {
   return quests.filter((q) => !isStepsQuest(q));
 }

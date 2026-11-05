@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { env } from "../../config/env.js";
 import { getHealthStatus } from "../health/health.service.js";
+import * as dailyLogsService from "../daily-logs/daily-logs.service.js";
 import * as adminRepository from "./admin.repository.js";
 
 export class AdminError extends Error {
@@ -76,6 +77,27 @@ export async function getOverview() {
     otpsToday: otps_today,
     todayKey: today,
   };
+}
+
+/** Rebuild every hunter streak from No Fap hold history. */
+export async function recalcAllNoFapStreaks() {
+  const rows = await adminRepository.listHunters();
+  const results: Array<{
+    id: number;
+    name: string;
+    previousStreak: number;
+    streak: number;
+  }> = [];
+  for (const h of rows) {
+    const out = await dailyLogsService.recalcHunterNoFapStreak(h.id);
+    results.push({
+      id: h.id,
+      name: h.name,
+      previousStreak: out.previous_streak,
+      streak: out.streak,
+    });
+  }
+  return { updated: results.length, hunters: results };
 }
 
 export async function listHunters(search?: string) {

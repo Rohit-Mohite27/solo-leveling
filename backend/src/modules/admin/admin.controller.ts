@@ -150,3 +150,9 @@ export async function health(_req: Request, res: Response) {
   const data = await adminService.adminHealth();
   res.json({ success: true, data });
 }
+
+/** One-shot: rebuild all hunters' streaks from No Fap hold history. */
+export async function recalcNoFapStreaks(_req: Request, res: Response) {
+  const data = await adminService.recalcAllNoFapStreaks();
+  res.json({ success: true, data });
+}

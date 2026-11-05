@@ -54,14 +54,14 @@ export async function submitToday(req: Request, res: Response) {
       err instanceof Error && "code" in err
         ? String((err as Error & { code?: string }).code ?? "")
         : "";
-    if (code === "TASKS_INCOMPLETE") {
+    if (code === "TASKS_INCOMPLETE" || code === "NO_PROGRESS") {
       res.status(400).json({
         success: false,
-        code: "TASKS_INCOMPLETE",
+        code: code || "TASKS_INCOMPLETE",
         message:
           err instanceof Error
             ? err.message
-            : "Complete all assigned tasks before submitting the day",
+            : "Clear at least one task before submitting the day",
       });
       return;
     }

@@ -16,6 +16,7 @@ import {
   migrateStarterQuests,
   allyForLevel,
   coreQuests,
+  isNoFapQuest,
   isStepsQuest,
   nextAlly,
   todayKey,
@@ -337,11 +338,13 @@ export function HunterProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Retry while Render cold-starts (members otherwise see a frozen login screen)
+      // Retry while the API cold-starts, but never hold the gate splash past ~20s.
       const maxAttempts = 4;
+      const deadline = Date.now() + 20_000;
       let lastErr: unknown = null;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (cancelled) return;
+        if (Date.now() > deadline) break;
         try {
           const me = await fetchMe();
           if (cancelled) return;
@@ -537,7 +540,10 @@ export function HunterProvider({ children }: { children: ReactNode }) {
     let leveled = false;
     let newLevel = 0;
 
-    if (state.quests.length === 0) {
+    const core = coreQuests(state.quests);
+    const anyCleared = core.some((q) => state.today.logs[q.id]?.cleared);
+    // Must clear at least one core task (No Fap counts) — blocks empty-day cheats
+    if (core.length === 0 || !anyCleared) {
       return { leveled: false, newLevel: 0, blocked: true };
     }
 
@@ -556,18 +562,24 @@ export function HunterProvider({ children }: { children: ReactNode }) {
           const allClear = coreQuests(state.quests).every(
             (q) => state.today.logs[q.id]?.cleared,
           );
+          const noFapHeld = state.quests.some(
+            (q) => isNoFapQuest(q) && state.today.logs[q.id]?.cleared,
+          );
           // Day chest = goal work only; extras charge Overload Cache separately
           let chestXp = breakdown.clearedXp;
+          const nextStreak = result.hunter.streak ?? (noFapHeld ? state.streak + 1 : 0);
           if (allClear) {
             chestXp += 40;
-            const nextStreak = (result.hunter.streak ?? state.streak) || 1;
             if (nextStreak > 1) chestXp += Math.min(50, nextStreak * 5);
+          } else if (noFapHeld && nextStreak > 1) {
+            chestXp += Math.min(50, nextStreak * 5);
           }
           const reward = buildReward(
             allClear ? "day_clear" : "partial_day",
             chestXp,
           );
-          const brokeStreak = !allClear && state.streak > 0;
+          // Army loss only when No Fap breaks — workouts no longer wipe the streak
+          const brokeStreak = !noFapHeld && state.streak > 0;
           setState((s) => {
             const next = {
               ...s,
@@ -612,6 +624,9 @@ export function HunterProvider({ children }: { children: ReactNode }) {
       const core = coreQuests(s.quests);
       const allClear =
         core.length > 0 && core.every((q) => s.today.logs[q.id]?.cleared);
+      const noFapHeld = s.quests.some(
+        (q) => isNoFapQuest(q) && s.today.logs[q.id]?.cleared,
+      );
       const questClears: Record<string, boolean> = {};
       for (const q of s.quests) {
         questClears[q.id] = Boolean(s.today.logs[q.id]?.cleared);
@@ -626,13 +641,15 @@ export function HunterProvider({ children }: { children: ReactNode }) {
           ];
 
       const prevStreak = s.streak;
-      const streak = allClear ? s.streak + 1 : 0;
-      const brokeStreak = !allClear && prevStreak > 0;
+      const streak = noFapHeld ? s.streak + 1 : 0;
+      const brokeStreak = !noFapHeld && prevStreak > 0;
       const breakdown = computeRewardBreakdown(s.quests, s.today.logs);
       let chestXp = breakdown.clearedXp;
       if (allClear) {
         chestXp += 40;
         if (streak > 1) chestXp += Math.min(50, streak * 5);
+      } else if (noFapHeld && streak > 1) {
+        chestXp += Math.min(50, streak * 5);
       }
 
       // Level only from a fully cleared day — Essence stays in unclaimed chests

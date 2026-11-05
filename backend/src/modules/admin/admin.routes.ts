@@ -11,6 +11,7 @@ import {
   logout,
   me,
   overview,
+  recalcNoFapStreaks,
   resetHunter,
   resetHunterDates,
 } from "./admin.controller.js";
@@ -30,4 +31,5 @@ adminRouter.get("/hunters/:id/days/:dateKey", requireAdmin, asyncHandler(getHunt
 adminRouter.post("/hunters/:id/reset", requireAdmin, asyncHandler(resetHunter));
 adminRouter.post("/hunters/:id/reset-dates", requireAdmin, asyncHandler(resetHunterDates));
 adminRouter.delete("/hunters/:id", requireAdmin, asyncHandler(deleteHunter));
+adminRouter.post("/recalc-nofap-streaks", requireAdmin, asyncHandler(recalcNoFapStreaks));
 adminRouter.get("/health", requireAdmin, asyncHandler(health));

@@ -2,7 +2,8 @@
 
 type SubmitDayConfirmModalProps = {
   open: boolean;
-  allCleared: boolean;
+  /** True when today's No Fap quest is marked held */
+  noFapHeld: boolean;
   onClose: () => void;
   onConfirm: () => void;
 };
@@ -10,7 +11,7 @@ type SubmitDayConfirmModalProps = {
 /** Always shown before day submit — day locks after confirm. */
 export function SubmitDayConfirmModal({
   open,
-  allCleared,
+  noFapHeld,
   onClose,
   onConfirm,
 }: SubmitDayConfirmModalProps) {
@@ -41,10 +42,15 @@ export function SubmitDayConfirmModal({
           Are you sure you want to submit for the day? You won&apos;t be able to add any more
           progress after this for today.
         </p>
-        {!allCleared && (
+        {!noFapHeld ? (
           <p className="mt-3 rounded-xl bg-system-danger/10 px-3 py-2.5 text-sm font-semibold text-system-danger">
-            Some goals are still below target. Submitting now resets your streak and seals your
-            allies & shadows until you clear days again.
+            No Fap is not marked Held. Submitting now resets your streak and seals allies &amp;
+            shadows until you hold again.
+          </p>
+        ) : (
+          <p className="mt-3 rounded-xl bg-lilac-100/80 px-3 py-2.5 text-sm font-semibold text-lilac-700">
+            No Fap Held — your streak continues. Workout goals still affect XP and day-clear
+            bonuses, but not the streak count.
           </p>
         )}
         <div className="mt-6 flex flex-col gap-2">

@@ -96,9 +96,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getSessionToken();
   let res: Response;
   try {
+    // Bound the wait so a hung host cannot leave the gate splash up forever.
     res = await fetch(`${API_URL}${path}`, {
       ...init,
       credentials: "include",
+      signal: init?.signal ?? AbortSignal.timeout(12_000),
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -108,7 +110,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new ApiError(
       "NETWORK_ERROR",
-      "Cannot reach the API (Render may be waking up — wait ~30s and retry)",
+      "Cannot reach the API (server may be waking up — wait ~30s and retry)",
       0,
     );
   }
